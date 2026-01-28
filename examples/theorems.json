@@ -127,11 +127,11 @@
             "cites": [
               {
                 "tag": "Line",
-                "contents": 1
+                "contents": 4
               },
               {
                 "tag": "Line",
-                "contents": 4
+                "contents": 1
               }
             ]
           }
@@ -148,11 +148,11 @@
             "cites": [
               {
                 "tag": "Line",
-                "contents": 2
+                "contents": 6
               },
               {
                 "tag": "Line",
-                "contents": 6
+                "contents": 2
               }
             ]
           }
