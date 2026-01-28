@@ -1,0 +1,122 @@
+README for Hmm
+==============
+
+Hmm is an implementation of a parser and proof verifier (and later maybe more)
+for databases of mathematical proofs described using the Metamath language.
+Metamath (see http://metamath.org) is both a file format for these databases,
+specified in just a couple of pages (see the Metamath book); and an extensive
+program to interactively view such databases, find proofs for statements, and
+saving those proofs.  Metamath --in both meanings of the word-- was created and
+is maintained by Norman Megill.  He also maintains an impressive Metamath
+formalization of set theory, containing over 80000 lines with over 6000
+theorems and lemmas proven from 17 axioms.
+
+Hmm has been written as a cleanroom implementation of the Metamath
+specification.
+
+The longer-term goal is to use the Hmm module (which just parses and verifies a
+database) as a basis for a program to generate calculational proofs from
+Metamath proofs.
+
+Hmm was written in Haskell by Marnix Klooster <marnix.klooster@gmail.com>.
+
+
+Download
+--------
+At the time of writing, the *development* version of Hmm is found on the web at
+
+	http://www.solcon.nl/mklooster/repos/hmm/
+
+This is actually a darcs repository, which means that the change history can be
+downloaded, and patches can be submitted, using the darcs software
+configuration management system (www.darcs.net).  Just install darcs and
+
+	darcs get http://www.solcon.nl/mklooster/repos/hmm/
+
+This will create a directory 'hmm' with the latest version and the change
+history.
+
+The latest stable version is version 0.3, which can be retrieved using the
+following darcs command:
+
+	darcs get --tag=0.3 http://www.solcon.nl/mklooster/repos/hmm/
+
+To run Hmm you will need a Haskell implementation.  Hmm was developed using GHC
+6.4 (see http://haskell.org/ghc/), but other Haskell implementations might work
+as well.
+
+
+Release notes
+-------------
+Version 0.3 is the first 'official' release in almost 11 years, and its only
+goal to have a version number to refer to the status quo.  I don't really
+remember what was changed inbetween --please see the darcs log for that--, but
+the intention of this release is to be used as a baseline entry in the
+metamath-test project (https://github.com/david-a-wheeler/metamath-test).
+
+Version 0.2 was a performance release; ql.mm now is verified 4 to 5 times
+faster than before on my development machine.  And set.mm is now processed
+quickly enough (half a minute for me) that I'm prepared to wait for the result
+:-)  The performance gain is larger for files that contain compressed proofs;
+uncompressed proofs probably haven't benefitted that much (but I haven't
+measured).
+
+By the way, the version 0.2 code should be more readable in several places as
+well-- for Haskell code, readability and performance often seem to go hand in
+hand.
+
+Version 0.1 was the first public release.  I have no idea whether I will
+have time to hack further on Hmm in the future, but in any case bug reports,
+patches (preferably using darcs), and comments are welcome.
+
+Version 0.1 is intended to conform fully to the Metamath specification, with
+the following exceptions:
+
+ - Include files (i.e., $[ ... $]) are not supported.
+
+ - Proofs containing unknown steps ('?') are not supported.
+
+ - Optional disjoint variable restrictions for theorems (e.g., $d x y $. for a
+   $p statement containing no y) are not necessary, even if they are used in
+   the proof.
+       This was done to make the implementation simpler.  It means that
+   slightly more database files are accepted by Hmm than by Metamath.  However,
+   Hmm allows exactly the same theorems to be proved as Metamath.
+
+
+Acknowledgements
+----------------
+Thanks to Norman ``Norm'' Megill for the concept and implementation of
+Metamath, and for set.mm as a gold mine of test data for Hmm.  And for being
+very open and responsive to questions and remarks on Metamath.
+
+Thanks to Haskell, the great programming language, and specifically to the
+creators of GHC which I used to develop Hmm.  And also for that large and
+growing collection of standard libraries that I'm happily using.
+
+Thanks to Daan Leijen for Parsec, the beautiful parser library for Haskell.
+
+Thanks to Dean Herington for creating HUnit, the Haskell Unit Test framework
+that is used for the Hmm unit tests. 
+
+And of course thanks to David Roundy for 'darcs', which enabled me develop
+quickly on three different machines, and moving patches around very easily.
+
+
+License
+-------
+Hmm: a Haskell library to parse and verify Metamath proof databases
+Copyright (C) 2005-2006  Marnix Klooster <marnix.klooster@gmail.com>
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+The latest version of the GPL can currently be found at
+http://www.gnu.org/copyleft/gpl.html.

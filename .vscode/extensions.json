@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "haskell.haskell",
+        "mkhl.direnv",
+        "xuanji.metamath-syntax-highlighting",
+        "bbenoist.nix"
+    ]
+}

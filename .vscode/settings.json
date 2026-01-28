@@ -1,0 +1,6 @@
+{
+  "haskell.manageHLS": "PATH", // We are managing the HLS through Nix dev shell instead of GHCup
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  "editor.detectIndentation": false
+}

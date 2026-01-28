@@ -1,0 +1,8 @@
+ProvableLogicStmtType,;
+LogicStmtType,stmt
+LoadFile,fol.mm
+
+VerifyProof,*
+Parse,* 
+
+RunProofAsstGUI
