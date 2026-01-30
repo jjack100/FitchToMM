@@ -1,3 +1,4 @@
+Clear
 ProvableLogicStmtType,;
 LogicStmtType,stmt
 LoadFile,fol.mm

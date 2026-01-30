@@ -375,7 +375,7 @@ ${  $( Reverse direction of equality elimination $)
     thm.eq-elim-2.3 $e ; ... |- ( eq trm_1 trm_2 ) $.
     thm.eq-elim-2.4 $e ; ... |- psi $.
     thm.eq-elim-2   $p ; ... |- phi $=
-      ( lst.single wff.atm sub.none_trm sub.rep sub.trm axm.eq-elim-1
+      ( lst.single wff.atm sub.none-trm sub.rep sub.trm axm.eq-elim-1
       prd.eq lst.append sub.prd trm.var axm.eq-intr ) ACBDEGFIHARFFLZ
       SZMRFGLZSZMRFEUALZSZMEFGERFUDUHEFFFUCUGEFUCNEFOPTERGUFUHEFFGUEU
       GEGUCNEGOPTJAFUBQKQ $.
