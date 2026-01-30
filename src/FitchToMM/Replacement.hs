@@ -20,9 +20,8 @@ import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.SyntaxProver
 
-{- Given two formulae P and Q, and a variable x, determine what (if any)
-   variable a exists in Q such that P replaces a in Q with x
--}
+-- Given two formulae P and Q, and a variable x, determine what (if any)
+-- variable a exists in Q such that P replaces a in Q with x
 solveForVar :: AllowedSubs -> Wff -> Wff -> T.Text -> Maybe T.Text
 solveForVar freeIn p q x = asum $ S.map getIfValid (varsInWff q)
   where
@@ -32,9 +31,8 @@ solveForVar freeIn p q x = asum $ S.map getIfValid (varsInWff q)
         else Nothing
     getIfValid _ = Nothing
 
-{- Given two formulae P and Q, and a variable x, determine what (if any) term
-   t exists such that P replaces x in Q with t
--}
+-- Given two formulae P and Q, and a variable x, determine what (if any) term
+-- t exists such that P replaces x in Q with t
 solveForTrm :: AllowedSubs -> Wff -> Wff -> T.Text -> Maybe Term
 solveForTrm freeIn wff1 wff2 x = do
   candidate <- findSub wff1 wff2 >>= getFirst
@@ -65,10 +63,10 @@ solveForTrm freeIn wff1 wff2 x = do
     findSubTrm (TrmConst c) (TrmConst c') | c == c' = Just mempty
     findSubTrm _ _ = Nothing
 
-{- Given two formulae P and Q, two terms t1 and t2, and a variable x, determine
-   what (if any) formula R exists that has the variable x in those locations
-   where Q swaps t1 for t2 compared to P. I.e., x serves as a placeholder to
-   account for those differences between P and Q. -}
+-- Given two formulae P and Q, two terms t1 and t2, and a variable x, determine
+-- what (if any) formula R exists that has the variable x in those locations
+-- where Q swaps t1 for t2 compared to P. I.e., x serves as a placeholder to
+-- account for those differences between P and Q.
 solveForWff :: AllowedSubs -> Wff -> Wff -> Term -> Term -> T.Text -> Maybe Wff
 solveForWff freeIn wff1 wff2 t1 t2 x = do
   candidate <- findSub wff1 wff2
@@ -107,7 +105,7 @@ proveReplWff freeIn w x w' withTrm
       wPrf <- proveWff w
       vPrf <- proveVar x
       tPrf <- proveTrm withTrm
-      sPrf <- proveLabel "sub.none_wff"
+      sPrf <- proveStep subNoneWffStep
       return $ wPrf <> vPrf <> tPrf <> sPrf
 -- Handle binary connectives
 proveReplWff freeIn (WffBinOp op w1 w2) x (WffBinOp op' w1' w2') withTrm
@@ -121,7 +119,7 @@ proveReplWff freeIn (WffBinOp op w1 w2) x (WffBinOp op' w1' w2') withTrm
       let fHyps = ph1Prf <> ps1Prf <> ph2Prf <> ps2Prf <> vPrf <> tPrf
       r1Prf <- proveReplWff freeIn w1 x w1' withTrm
       r2Prf <- proveReplWff freeIn w2 x w2' withTrm
-      subPrf <- proveLabel $ subBinOpLabel op
+      subPrf <- proveStep $ subBinOpStep op
       return $ fHyps <> r1Prf <> r2Prf <> subPrf
 -- Handle the unary connective (negation)
 proveReplWff freeIn (WffNot w) x (WffNot w') withTrm = do
@@ -131,7 +129,7 @@ proveReplWff freeIn (WffNot w) x (WffNot w') withTrm = do
   tPrf <- proveTrm withTrm
   let fHyps = ph1Prf <> ph2Prf <> vPrf <> tPrf
   rPrf <- proveReplWff freeIn w x w' withTrm
-  sPrf <- proveLabel "sub.not"
+  sPrf <- proveStep subNotStep
   return $ fHyps <> rPrf <> sPrf
 -- Handle quantifiers
 proveReplWff freeIn (WffQnt q y w) x (WffQnt q' y' w') withTrm
@@ -145,11 +143,11 @@ proveReplWff freeIn (WffQnt q y w) x (WffQnt q' y' w') withTrm
       psPrf <- proveWff w'
       xPrf <- proveVar x
       yPrf <- proveVar y
-      qPrf <- proveLabel $ qntLabel q
+      qPrf <- proveStep $ qntStep q
       tPrf <- proveTrm withTrm
       let fHyps = phPrf <> psPrf <> xPrf <> yPrf <> qPrf <> tPrf
       rPrf <- proveReplWff freeIn w x w' withTrm
-      sPrf <- proveLabel "sub.qnt"
+      sPrf <- proveStep subQntStep
       return $ fHyps <> rPrf <> sPrf
 -- Handle case where the variable is bound
 proveReplWff _ (WffQnt q x w) v (WffQnt q' x' w') withTrm
@@ -159,20 +157,20 @@ proveReplWff _ (WffQnt q x w) v (WffQnt q' x' w') withTrm
     x == v = do
       phPrf <- proveWff w
       xPrf <- proveVar x
-      qPrf <- proveLabel $ qntLabel q
+      qPrf <- proveStep $ qntStep q
       tPrf <- proveTrm withTrm
-      sPrf <- proveLabel "sub.qnt_bound"
+      sPrf <- proveStep subQntBoundStep
       return $ phPrf <> xPrf <> qPrf <> tPrf <> sPrf
 -- Handle predicates
 proveReplWff freeIn (WffAtom p args) v (WffAtom p' args') t
   | p == p' = do
       vPrf <- proveVar v
-      pPrf <- proveLabel $ "prd." <> p
+      pPrf <- proveStep $ prdStep p
       tPrf <- proveTrm t
       args1Prf <- proveLst args
       args2Prf <- proveLst args'
       rPrf <- proveReplLst freeIn args v args' t
-      subPrf <- proveLabel "sub.prd"
+      subPrf <- proveStep subPrdStep
       return $ vPrf <> pPrf <> tPrf <> args1Prf <> args2Prf <> rPrf <> subPrf
 proveReplWff _ _ _ _ _ = W.lift $ Left Inapplicable
 
@@ -185,7 +183,7 @@ proveReplLst freeIn l x l' withTrm
       vPrf <- proveVar x
       tPrf <- proveTrm withTrm
       lPrf <- proveLst l
-      sPrf <- proveLabel "sub.none_trm"
+      sPrf <- proveStep subNoneTrmStep
       return $ vPrf <> tPrf <> lPrf <> sPrf
 -- Recursive case
 proveReplLst freeIn lst1 v lst2 withTrm =
@@ -199,7 +197,7 @@ proveReplLst freeIn lst1 v lst2 withTrm =
         l2Prf <- provePrependLst ts2
         r1Prf <- proveItems [t1] [t2]
         r2Prf <- proveItems ts1 ts2
-        sPrf <- proveLabel "sub.trm"
+        sPrf <- proveStep subTrmStep
         return $ vPrf <> t1prf <> t2prf <> t3prf <> l1Prf <> l2Prf <> r1Prf <> r2Prf <> sPrf
       proveItems _ _ = W.lift $ Left EmptyList
    in -- Reverse the lists before recursing over them because metamath expects
@@ -214,7 +212,7 @@ proveReplTrm freeIn trm1 v trm2 withTrm
       vPrf <- proveVar v
       tPrf <- proveTrm withTrm
       lPrf <- proveLst [trm1]
-      sPrf <- proveLabel "sub.none_trm"
+      sPrf <- proveStep subNoneTrmStep
       return $ vPrf <> tPrf <> lPrf <> sPrf
 
 -- Case where the term is the variable being replaced
@@ -223,26 +221,20 @@ proveReplTrm _ trm v (TrmVar x) withTrm
     v == x = do
       xPrf <- proveVar x
       tPrf <- proveTrm trm
-      rPrf <- proveLabel "sub.rep"
+      rPrf <- proveStep subRepStep
       return $ xPrf <> tPrf <> rPrf
 -- Case for where the term is a function of other terms
 proveReplTrm freeIn (TrmFunc f args) v (TrmFunc f' args') t
   | f == f' = do
       xPrf <- proveVar v
-      fPrf <- proveLabel $ "func." <> f
+      fPrf <- proveStep $ funcStep f
       tPrf <- proveTrm t
       args1Prf <- proveLst args
       args2Prf <- proveLst args'
       rPrf <- proveReplLst freeIn args v args' t
-      sPrf <- proveLabel "sub.func"
+      sPrf <- proveStep subFuncStep
       return $ xPrf <> fPrf <> tPrf <> args1Prf <> args2Prf <> rPrf <> sPrf
 proveReplTrm _ _ _ _ _ = W.lift $ Left Inapplicable
-
-subBinOpLabel :: BinOp -> T.Text
-subBinOpLabel OpAnd = "sub.and"
-subBinOpLabel OpOr = "sub.or"
-subBinOpLabel OpImplies = "sub.implies"
-subBinOpLabel OpIff = "sub.iff"
 
 occursInWff :: AllowedSubs -> T.Text -> Wff -> Bool
 occursInWff f x (WffBinOp _ lhs rhs) = occursInWff f x lhs || occursInWff f x rhs
@@ -258,3 +250,39 @@ occursInTrm _ x (TrmVar y) = x == y
 occursInTrm f x (TrmFunc _ args) = any (occursInTrm f x) args
 occursInTrm _ _ (TrmConst _) = False
 occursInTrm f x (TrmMetavar var) = x `elem` f var
+
+-- Define the labels and number of mandatory hypotheses they take as they
+-- appear in the Metamath database:
+
+subRepStep :: RpnStep
+subRepStep = RpnStep 2 "sub.rep"
+
+subNoneWffStep :: RpnStep
+subNoneWffStep = RpnStep 3 "sub.none-wff"
+
+subNoneTrmStep :: RpnStep
+subNoneTrmStep = RpnStep 3 "sub.none-trm"
+
+subBinOpStep :: BinOp -> RpnStep
+subBinOpStep OpAnd = RpnStep 8 "sub.and"
+subBinOpStep OpOr = RpnStep 8 "sub.or"
+subBinOpStep OpImplies = RpnStep 8 "sub.implies"
+subBinOpStep OpIff = RpnStep 8 "sub.iff"
+
+subNotStep :: RpnStep
+subNotStep = RpnStep 5 "sub.not"
+
+subQntStep :: RpnStep
+subQntStep = RpnStep 7 "sub.qnt"
+
+subQntBoundStep :: RpnStep
+subQntBoundStep = RpnStep 4 "sub.qnt-bound"
+
+subPrdStep :: RpnStep
+subPrdStep = RpnStep 6 "sub.prd"
+
+subFuncStep :: RpnStep
+subFuncStep = RpnStep 6 "sub.func"
+
+subTrmStep :: RpnStep
+subTrmStep = RpnStep 8 "sub.trm"

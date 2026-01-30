@@ -90,13 +90,15 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
           lift $ Left LeftUndischarged
     -- Handle premises
     step _ (FlatStep _ _ (Premise num) _ _) =
-      proveLabel $
-        "thm." <> prfName <> "." <> T.pack (show $ num + 1)
+      proveStep $
+        RpnStep
+          0
+          ("thm." <> prfName <> "." <> T.pack (show $ num + 1))
     -- Handle assumptions
     step _ (FlatStep (assump : ctx) wff Assumption _ _) | assump == wff = do
       ctxPrf <- proveCtx ctx
       wffPrf <- proveWff wff
-      assumePrf <- proveLabel "axm.assume"
+      assumePrf <- proveStep $ RpnStep 2 "axm.assume"
       return $ ctxPrf <> wffPrf <> assumePrf
     step _ (FlatStep _ _ Assumption _ _) = lift $ Left BadAssumption
     -- Handle reiteration
@@ -149,7 +151,8 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
       fHypPrfs <- mapM (proveFHyp fullSub) fHyps
       replPrfs <- sequence replacements
       eHypPrfs <- mapM (lookupProof i ctx) citations
-      labelProof <- proveLabel ref
+      let numMandHyps = length fHyps + length eHyps + length replacements
+      labelProof <- proveStep $ RpnStep numMandHyps ref
       return $
         mconcat fHypPrfs
           <> mconcat replPrfs
@@ -310,7 +313,7 @@ proveThin (psi : ctx) stp@(FlatStep _ phi _ _ _) base = do
   phiPrf <- proveWff phi
   psiPrf <- proveWff psi
   prev <- proveThin ctx stp base
-  thinPrf <- proveLabel "axm.thin"
+  thinPrf <- proveStep $ RpnStep 4 "axm.thin"
   return $ ctxPrf <> phiPrf <> psiPrf <> prev <> thinPrf
 proveThin _ _ _ = lift $ Left Inapplicable
 

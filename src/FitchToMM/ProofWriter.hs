@@ -6,11 +6,12 @@ module FitchToMM.ProofWriter
   ( ProofWriter,
     Mistake (..),
     RpnStack,
+    RpnStep(..),
     ProofProps (..),
     FHyp (..),
     proveMetavar,
     proveVar,
-    proveLabel,
+    proveStep,
     runProofWriter,
     reqDisjoint,
     execProofWriter,
@@ -22,7 +23,7 @@ module FitchToMM.ProofWriter
     proveWffMetavar,
     markInternal,
     listStack,
-    DVR(..),
+    DVR (..),
     reqDisjointFor,
     PropWriter,
   )
@@ -31,7 +32,6 @@ where
 import qualified Control.Monad.Writer.Strict as W
 import qualified Data.DList as D
 import Data.Either
-import Data.Maybe
 import Data.Semigroup.Generic
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -39,6 +39,7 @@ import GHC.Generics
 
 -- Helper Monad to build the RPN stack while tracking properties about the proof
 type ProofWriter = W.WriterT ProofProps (Either Mistake) RpnStack
+
 type PropWriter = W.WriterT ProofProps (Either Mistake) ()
 
 data ProofProps = ProofProps (S.Set FHyp) (S.Set DVR)
@@ -47,7 +48,11 @@ data ProofProps = ProofProps (S.Set FHyp) (S.Set DVR)
     (Semigroup, Monoid)
     via (GenericSemigroupMonoid ProofProps)
 
-newtype RpnStack = RpnStack (D.DList (Maybe T.Text))
+newtype RpnStack = RpnStack (D.DList (Maybe RpnStep))
+  deriving (Show)
+
+-- Arity and label
+data RpnStep = RpnStep Int T.Text
   deriving (Show)
 
 instance Semigroup RpnStack where
@@ -85,7 +90,7 @@ data Mistake
 proveMetavar :: FHyp -> ProofWriter
 proveMetavar fhyp = do
   W.tell $ ProofProps (S.singleton fhyp) S.empty
-  proveLabel $ case fhyp of
+  proveStep $ RpnStep 0 $ case fhyp of
     VarHyp l -> "var." <> l
     TrmHyp l -> "trm." <> l
     WffHyp l -> "wff." <> l
@@ -112,8 +117,8 @@ proveTrmMetavar = proveMetavar . TrmHyp
 proveEllipsis :: ProofWriter
 proveEllipsis = proveMetavar $ CtxHyp "..."
 
-proveLabel :: T.Text -> ProofWriter
-proveLabel = pure . RpnStack . D.singleton . Just
+proveStep :: RpnStep -> ProofWriter
+proveStep = pure . RpnStack . D.singleton . Just
 
 reqDisjoint :: DVR -> W.WriterT ProofProps (Either Mistake) ()
 reqDisjoint (DVR v1 v2) = do
@@ -143,4 +148,6 @@ succeeded :: ProofWriter -> Bool
 succeeded = isRight . W.runWriterT
 
 listStack :: RpnStack -> [T.Text]
-listStack (RpnStack stack) = map (fromMaybe "?") $ D.toList stack
+listStack (RpnStack stack) =
+  let getLabel (RpnStep _ label) = label
+   in map (maybe "?" getLabel) $ D.toList stack
