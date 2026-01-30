@@ -273,8 +273,8 @@ $)
 
 $c REPLACES WITH IN $.
 
-stmt.sub_wff $a stmt phi REPLACES x IN psi WITH trm_1 $.
-stmt.sub_trm $a stmt ..t REPLACES x IN ..u WITH trm_1 $.
+stmt.sub-wff $a stmt phi REPLACES x IN psi WITH trm_1 $.
+stmt.sub-trm $a stmt ..t REPLACES x IN ..u WITH trm_1 $.
 
 $( Base cases: $)
 
@@ -283,10 +283,10 @@ sub.rep $a ; trm_1 REPLACES x IN x WITH trm_1 $.
 
 ${  $( Nothing is replaced when there are no occurrences $)
     $d x phi $.
-    sub.none_wff $a ; phi REPLACES x IN phi WITH trm_1 $.
+    sub.none-wff $a ; phi REPLACES x IN phi WITH trm_1 $.
 $} ${
     $d x ..t $.
-    sub.none_trm $a ; ..t REPLACES x IN ..t WITH trm_1 $.
+    sub.none-trm $a ; ..t REPLACES x IN ..t WITH trm_1 $.
 $}
 
 $( Recursive cases: $)
@@ -311,7 +311,7 @@ ${  $( And for quantifiers $)
     sub.qnt   $a ; ( qnt_1 y phi ) REPLACES x IN ( qnt_1 y psi ) WITH trm_1 $.
 $}
 $( When x is bound, no substitution occurs $)
-sub.qnt_bound $a ; ( qnt_1 x phi ) REPLACES x IN ( qnt_1 x phi ) WITH trm_1 $.
+sub.qnt-bound $a ; ( qnt_1 x phi ) REPLACES x IN ( qnt_1 x phi ) WITH trm_1 $.
 
 ${  $( A predicate or function replaces if all its arguments do $)
     sub.arg.1 $e ; ..t            REPLACES x IN ..u            WITH trm_1 $.
