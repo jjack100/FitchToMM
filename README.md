@@ -1,5 +1,6 @@
 # FitchToMM
 FitchToMM is a tool for converting Fitch-style proofs (for first-order logic) to the [Metamath](https://us.metamath.org/) format, and provides a Metamath database formalizing natural deduction for these proofs to use.
+A longer-term goal for this project is for it to serve as a backend to a UI that can provide a prettier visual editor for proofs; see also [fol-parser](https://github.com/jjack100/fol-parser) for transforming formulae written in $\LaTeX$ into the S-expression syntax used here.
 
 ## What is Metamath?
 Metamath is a file format (and associated [program](https://github.com/metamath/metamath-exe)) for storing mathematical proofs in a way that can be very efficiently verified by a computer.
@@ -17,7 +18,6 @@ It is characterized by:
   2. Arranging steps in a line-by-line format, so that each step can cite a previous step or subproof by line number.
 
 Typically this is depicted in a visual diagram that uses indented sections to indicate the scope of each subproof.
-A longer-term goal for this project is for it to serve as a backend to a UI that can provide a prettier visual editor for proofs.
 
 ## How to use
 This repository is a Nix flake that provides:
