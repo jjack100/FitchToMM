@@ -1,0 +1,6 @@
+# Treat .mm files as plain text
+# (GitHub Linguist misclassifies Metamath as Objective-C++)
+*.mm linguist-language=Text
+
+# Exclude vendored dependencies from stats
+vendor/** linguist-vendored
