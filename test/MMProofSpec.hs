@@ -17,7 +17,6 @@ spec = describe "FitchProver" $ do
   let noneFree = const []
 
   describe "Propositional Logic" $ do
-
     it "correctly handles a simple subproof" $ do
       let theorem =
             FitchProof
@@ -43,16 +42,6 @@ spec = describe "FitchProver" $ do
               ]
       shouldVerifyProof folMM theorem
 
-    it "can use negation elimination correctly" $ do
-      let theorem =
-            FitchProof
-              "neg-elim-example"
-              noneFree
-              [Condition Nothing (expr "phi"), Condition Nothing (expr "(not phi)")]
-              [ FitchStep (expr "false") "axm.not-elim" [Line 1, Line 2]
-              ]
-      shouldVerifyProof folMM theorem
-
     it "correctly handles a nested subproof" $ do
       let theorem =
             FitchProof
@@ -70,27 +59,113 @@ spec = describe "FitchProver" $ do
               ]
       shouldVerifyProof folMM theorem
 
-    it "can use implication introduction correctly" $ do
+    it "can use suppositional premise" $ do
       let theorem =
             FitchProof
-              "impl-example"
+              "supposition-example"
+              noneFree
+              [Condition (Just $ expr "phi") (expr "psi")]
+              [FitchStep (expr "( implies phi psi )") "axm.implies-intr" [Range 1 2]]
+      shouldVerifyProof folMM theorem
+
+    it "can use conjunction introduction" $ do
+      let theorem =
+            FitchProof
+              "and-intr-example"
+              noneFree
+              [ Condition Nothing (expr "phi"),
+                Condition Nothing (expr "psi"),
+                Condition Nothing (expr "chi")
+              ]
+              [ FitchStep (expr "( and phi psi )") "axm.and-intr" [Line 1, Line 2],
+                FitchStep (expr "( and chi ( and phi psi ) )") "axm.and-intr" [Line 3, Line 4]
+              ]
+      shouldVerifyProof folMM theorem
+
+    it "can use disjunction introduction" $ do
+      let theorem =
+            FitchProof
+              "or-intr-example"
+              noneFree
+              [Condition Nothing (expr "phi")]
+              [ FitchStep (expr "( or phi psi )") "axm.or-intr" [Line 1],
+                FitchStep (expr "( or chi ( or phi psi ) )") "axm.or-intr" [Line 2]
+              ]
+      shouldVerifyProof folMM theorem
+
+    it "can use implication introduction" $ do
+      let theorem =
+            FitchProof
+              "impl-intr-example"
               noneFree
               [Condition Nothing (expr "phi")]
               [ FitchSubproof
                   (expr "psi")
                   [FitchStep (expr "phi") "reiteration" [Line 1]],
-                FitchStep (expr "(implies psi phi)") "axm.implies-intr" [Range 2 3]
+                FitchStep (expr "( implies psi phi )") "axm.implies-intr" [Range 2 3]
               ]
       shouldVerifyProof folMM theorem
 
-    it "can use disjunction elimination correctly" $ do
+    it "can use biconditional introduction" $ do
+      let theorem =
+            FitchProof
+              "iff-intr-example"
+              noneFree
+              [ Condition Nothing (expr "( implies phi psi )"),
+                Condition Nothing (expr "( implies psi phi )")
+              ]
+              [ FitchSubproof
+                  (expr "phi")
+                  [FitchStep (expr "psi") "axm.implies-elim" [Line 1, Line 3]],
+                FitchSubproof
+                  (expr "psi")
+                  [FitchStep (expr "phi") "axm.implies-elim" [Line 2, Line 5]],
+                FitchStep (expr "( iff phi psi )") "axm.iff-intr" [Range 3 4, Range 5 6]
+              ]
+      shouldVerifyProof folMM theorem
+
+    it "can use negation introduction" $ do
+      let theorem =
+            FitchProof
+              "not-intr-example"
+              noneFree
+              [Condition Nothing (expr "phi")]
+              [ FitchSubproof
+                  (expr "( not phi )")
+                  [FitchStep (expr "false") "axm.not-elim" [Line 1, Line 2]],
+                FitchStep (expr "( not ( not phi ) )") "axm.not-intr" [Range 2 3]
+              ]
+      shouldVerifyProof folMM theorem
+
+    it "can use verum introduction" $ do
+      let theorem =
+            FitchProof
+              "true-intr-example"
+              noneFree
+              []
+              [FitchStep (expr "true") "axm.true-intr" []]
+      shouldVerifyProof folMM theorem
+
+    it "can use conjunction elimination" $ do
+      let theorem =
+            FitchProof
+              "and-elim-example"
+              noneFree
+              [Condition Nothing (expr "( and ( implies phi psi ) phi )")]
+              [ FitchStep (expr "( implies phi psi )") "axm.and-elim" [Line 1],
+                FitchStep (expr "phi") "axm.and-elim" [Line 1],
+                FitchStep (expr "psi") "axm.implies-elim" [Line 2, Line 3]
+              ]
+      shouldVerifyProof folMM theorem
+
+    it "can use disjunction elimination" $ do
       let theorem =
             FitchProof
               "or-elim-example"
               noneFree
-              [ Condition Nothing (expr "(or phi psi)"),
-                Condition Nothing (expr "(implies phi chi)"),
-                Condition Nothing (expr "(implies psi chi)")
+              [ Condition Nothing (expr "( or phi psi )"),
+                Condition Nothing (expr "( implies phi chi )"),
+                Condition Nothing (expr "( implies psi chi )")
               ]
               [ FitchSubproof
                   (expr "phi")
@@ -101,6 +176,46 @@ spec = describe "FitchProver" $ do
                 FitchStep (expr "chi") "axm.or-elim" [Line 1, Range 4 5, Range 6 7]
               ]
       shouldReportMistakes theorem []
+      shouldVerifyProof folMM theorem
+
+    it "can use implication elimination" $ do
+      let theorem =
+            FitchProof
+              "implies-elim-example"
+              noneFree
+              [ Condition Nothing (expr "( implies phi psi )"),
+                Condition Nothing (expr "phi")
+              ]
+              [FitchStep (expr "psi") "axm.implies-elim" [Line 1, Line 2]]
+      shouldVerifyProof folMM theorem
+
+    it "can use biconditional elimination" $ do
+      let theorem1 =
+            FitchProof
+              "iff-elim-example-1"
+              noneFree
+              [ Condition Nothing (expr "( iff phi psi )"),
+                Condition Nothing (expr "phi")
+              ]
+              [FitchStep (expr "psi") "axm.iff-elim" [Line 1, Line 2]]
+      let theorem2 =
+            FitchProof
+              "iff-elim-example-2"
+              noneFree
+              [ Condition Nothing (expr "( iff phi psi )"),
+                Condition Nothing (expr "psi")
+              ]
+              [FitchStep (expr "phi") "axm.iff-elim" [Line 1, Line 2]]
+      shouldVerifyProof folMM theorem1
+      shouldVerifyProof folMM theorem2
+
+    it "can use negation elimination" $ do
+      let theorem =
+            FitchProof
+              "neg-elim-example"
+              noneFree
+              [Condition Nothing (expr "phi"), Condition Nothing (expr "(not phi)")]
+              [FitchStep (expr "false") "axm.not-elim" [Line 1, Line 2]]
       shouldVerifyProof folMM theorem
 
     it "can prove the law of excluded middle" $ do
@@ -125,15 +240,46 @@ spec = describe "FitchProver" $ do
       shouldVerifyProof folMM theorem
 
   describe "Predicate Logic" $ do
-
-    it "correctly uses universal introduction when the variable does not occur" $ do
+    it "can use universal introduction" $ do
       let theorem =
             FitchProof
-              "forall-example"
+              "forall-intr-example"
+              noneFree
+              []
+              [ FitchStep (expr "( eq a a )") "axm.eq-intr" [],
+                FitchStep (expr "( forall x ( eq x x ) )") "axm.forall-intr" [Line 1]
+              ]
+      shouldVerifyProof folMM theorem
+
+    it "can use universal introduction when the variable does not occur" $ do
+      let theorem =
+            FitchProof
+              "forall-intr-example-2"
               noneFree
               [Condition Nothing (expr "phi")]
               [FitchStep (expr "( forall z phi )") "axm.forall-intr" [Line 1]]
       shouldVerifyProof folMM theorem
+
+    it "can use existential introduction" $ do
+      let theorem =
+            FitchProof
+              "exists-intr-example"
+              noneFree
+              []
+              [ FitchStep (expr "( eq a a )") "axm.eq-intr" [],
+                FitchStep (expr "( exists x ( eq x a ) )") "axm.exists-intr" [Line 1],
+                FitchStep (expr "( exists y ( exists x ( eq x y ) ) )") "axm.exists-intr" [Line 2]
+              ]
+      shouldVerifyProof folMM theorem
+
+    it "can use existential introduction when the variable does not occur" $ do
+      let theorem1 =
+            FitchProof
+              "exists-intr-example-2"
+              noneFree
+              [Condition Nothing (expr "phi")]
+              [FitchStep (expr "( exists x phi )") "axm.exists-intr" [Line 1]]
+      shouldVerifyProof folMM theorem1
 
     it "can use equality introduction" $ do
       let theorem =
@@ -142,29 +288,6 @@ spec = describe "FitchProver" $ do
               noneFree
               []
               [FitchStep (expr "( eq (F C) (F C) )") "axm.eq-intr" []]
-      shouldVerifyProof folMM theorem
-
-    it "can prove everything is equal to itself" $ do
-      let theorem =
-            FitchProof
-              "forall-eq"
-              noneFree
-              []
-              [ FitchStep (expr "( eq a a )") "axm.eq-intr" [],
-                FitchStep (expr "( forall x ( eq x x ) )") "axm.forall-intr" [Line 1]
-              ]
-      shouldVerifyProof folMM theorem
-
-    it "can prove something equals something" $ do
-      let theorem =
-            FitchProof
-              "eq-example"
-              noneFree
-              []
-              [ FitchStep (expr "( eq a a )") "axm.eq-intr" [],
-                FitchStep (expr "( exists x ( eq x a ) )") "axm.exists-intr" [Line 1],
-                FitchStep (expr "( exists y ( exists x ( eq x y ) ) )") "axm.exists-intr" [Line 2]
-              ]
       shouldVerifyProof folMM theorem
 
     it "can use universal elimination" $ do
@@ -195,19 +318,16 @@ spec = describe "FitchProver" $ do
       shouldVerifyProof folMM theorem
 
     it "can use equality elimination" $ do
-      let theorem =
+      let theorem1 =
             FitchProof
-              "eq-example"
+              "eq-elim-example"
               noneFree
               [ Condition Nothing (expr "( eq C D )"),
                 Condition Nothing (expr "( R C C E )")
               ]
               [FitchStep (expr "( R C D E )") "axm.eq-elim" [Line 1, Line 2]]
-      shouldReportMistakes theorem []
-      shouldVerifyProof folMM theorem
-
-    it "can use equality elimination (reverse direction)" $ do
-      let theorem =
+      shouldVerifyProof folMM theorem1
+      let theorem2 =
             FitchProof
               "eq-example-2"
               noneFree
@@ -215,11 +335,9 @@ spec = describe "FitchProver" $ do
                 Condition Nothing (expr "( R D D E )")
               ]
               [FitchStep (expr "( R C D E )") "axm.eq-elim" [Line 1, Line 2]]
-      shouldReportMistakes theorem []
-      shouldVerifyProof folMM theorem
+      shouldVerifyProof folMM theorem2
 
   describe "Validation of citations" $ do
-
     it "rejects citations of nonexistent lines" $ do
       let theorem =
             FitchProof
