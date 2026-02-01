@@ -29,9 +29,15 @@ The resulting executable will be under `./result/bin/fitch2mm`.
 
 ### Running fitch2mm
 `fitch2mm` can be passed a JSON file to be read (see the `examples` directory for what format is expected).
-Basic usage is:
+Usage of the command is:
 ```
-fitch2mm <input-file> --output <output-file>
+Usage: fitch2mm [-f|--format FORMAT] [-o|--output OUTPUT_FILE] INPUT_FILE
+
+Available options:
+  -f,--format FORMAT       Output format: Normal or Packed (default: Normal)
+  -o,--output OUTPUT_FILE  File the generated Metamath will be written to
+                           (default: "out.mm")
+  -h,--help                Show this help text
 ```
 For example, to read the theorems from the `examples` directory:
 ```

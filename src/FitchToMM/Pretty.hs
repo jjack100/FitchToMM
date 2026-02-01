@@ -1,27 +1,52 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module FitchToMM.Pretty (printProof, prettyProof, prettyWff, prettyTrm) where
+module FitchToMM.Pretty
+  ( printProof,
+    prettyProof,
+    prettyWff,
+    prettyTrm,
+    prettyPacked,
+    prettyNormal,
+  )
+where
 
 import Data.List ((\\))
 import qualified Data.Text as T
+import FitchToMM.Axioms
+import FitchToMM.Compressed (PackedProof (PackedProof), PackedStep (Backreference, PackedStep, UnknownStep))
 import FitchToMM.FitchProof
 import FitchToMM.MMProof
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import Prettyprinter
-import FitchToMM.Axioms
 
 printProof :: MMProof -> IO ()
-printProof proof = print $ prettyProof proof
+printProof proof = print $ prettyNormal proof
 
-prettyProof :: MMProof -> Doc a
-prettyProof (MMProof name fact fHyps djVars rpnStack _) =
+prettyNormal :: MMProof -> Doc a
+prettyNormal (MMProof name fact fHyps djVars rpnStack _) =
+  let proof = fillSep $ map pretty $ listStack rpnStack
+   in prettyProof name fact fHyps djVars proof
+
+prettyPacked :: PackedProof -> Doc a
+prettyPacked (PackedProof name fact fHyps djVars rpnStack _) =
+  prettyProof name fact fHyps djVars proof
+  where
+    proof = fillSep $ map prettyLabel $ rpnStack
+    prettyLabel UnknownStep = "?"
+    prettyLabel (Backreference n) = pretty n
+    prettyLabel (PackedStep (Just n) stepLabel) =
+      pretty n <> ":" <> pretty stepLabel
+    prettyLabel (PackedStep Nothing stepLabel) = pretty stepLabel
+
+prettyProof :: Label -> Fact -> [FHyp] -> [DVR] -> Doc a -> Doc a
+prettyProof name fact fHyps djVars prettyStack =
   frame $
     vsep $
       prettyVars localVars
         ++ [sep $ map prettyDVR djVars | not $ null djVars]
         ++ zipWith prettyEHyp (map pad eLabels) eHyps
-        ++ [prettyPStmt (pad name) claim rpnStack]
+        ++ [prettyPStmt (pad name) claim prettyStack]
   where
     (Fact claim _ eHyps _) = fact
     eLabels = map (number name) [1 .. length eHyps]
@@ -52,13 +77,13 @@ prettyDVR (DVR var1 var2) =
     <+> pretty (fHypName var2)
     <+> "$."
 
-prettyPStmt :: T.Text -> Wff -> RpnStack -> Doc a
+prettyPStmt :: T.Text -> Wff -> Doc a -> Doc a
 prettyPStmt label claim proof =
   pretty label
     <+> "$p ; ... |-"
     <+> prettyWff claim
     <+> "$="
-    <+> nest 2 (line <> fillSep (map pretty $ listStack proof))
+    <+> nest 2 (line <> proof)
     <+> "$."
 
 prettyEHyp :: T.Text -> Condition -> Doc a
@@ -105,4 +130,3 @@ prettyQnt QntUnique = "unique"
 
 prettySExpr :: [Doc a] -> Doc a
 prettySExpr items = lparen <+> align (sep items) <+> rparen
-

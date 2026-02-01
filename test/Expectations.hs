@@ -48,7 +48,7 @@ verifyProof :: T.Text -> FitchProof -> Either String ()
 verifyProof base theorem@(FitchProof name _ _ _) = do
   let mmProof = fromFitchProof (const Nothing) theorem
   let metamath = pretty $ base <> sampleSyntaxMM
-  let full = renderString $ layoutCompact $ vsep [metamath, prettyProof (fromJust mmProof)]
+  let full = renderString $ layoutCompact $ vsep [metamath, prettyNormal (fromJust mmProof)]
   let label = T.unpack $ "thm." <> name
   (_, db) <- mmParseFromString full
   mmVerifiesLabel db label

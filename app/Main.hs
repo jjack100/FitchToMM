@@ -7,14 +7,16 @@ import Control.Monad (foldM, when)
 import Data.Aeson (FromJSON)
 import Data.Aeson.Decoding
 import qualified Data.ByteString.Lazy as BL
+import Data.Char
 import Data.Foldable
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
+import FitchToMM.Compressed (packProof)
 import FitchToMM.FitchProof (FitchProof (FitchProof))
 import FitchToMM.MMProof
 import FitchToMM.Parser (Language, primitives)
-import FitchToMM.Pretty (prettyProof)
+import FitchToMM.Pretty
 import FitchToMM.ProofWriter
 import FitchToMM.Schema (parseTheorem)
 import qualified FitchToMM.Schema as Schema
@@ -33,44 +35,65 @@ instance FromJSON Collection
 
 data Database = Database T.Text (M.Map T.Text Fact) Language
 
+data ProofFormat = Normal | Packed
+  deriving (Show, Read, Eq)
+
 data Options = Options
-  { inputFile :: FilePath,
-    outputFile :: FilePath
+  { optFormat :: ProofFormat,
+    optOutputFile :: FilePath,
+    optInputFile :: FilePath
   }
   deriving (Show)
+
+parseFormat :: String -> Either String ProofFormat
+parseFormat s = case map toLower s of
+  "normal" -> Right Normal
+  "packed" -> Right Packed
+  _ -> Left $ "Invalid format: " ++ s ++ ". Must be Normal or Packed"
 
 optionsParser :: Parser Options
 optionsParser =
   Options
-    <$> strArgument (metavar "FILE")
+    <$> option
+      (eitherReader parseFormat)
+      ( long "format"
+          <> short 'f'
+          <> value Normal
+          <> showDefault
+          <> metavar "FORMAT"
+          <> help "Output format: Normal or Packed"
+      )
     <*> strOption
       ( long "output"
           <> short 'o'
           <> value "out.mm"
-          <> metavar "FILENAME"
+          <> showDefault
+          <> metavar "OUTPUT_FILE"
           <> help "File the generated Metamath will be written to"
       )
+    <*> strArgument (metavar "INPUT_FILE")
 
 main :: IO ()
 main = do
-  opts <- execParser $ info optionsParser fullDesc
-  content <- BL.readFile (inputFile opts)
+  Options format outputFile inputFile <-
+    execParser $ info (optionsParser <**> helper) fullDesc
+  content <- BL.readFile inputFile
   folPath <- getDataFileName "fol.mm"
   folMM <- TIO.readFile folPath
   Collection theorems <- either fail pure $ eitherDecode content
-  let heading = "\n\n" <> (makeHeading $ T.pack $ inputFile opts)
+  let heading = "\n\n" <> (makeHeading $ T.pack inputFile)
   let base = Database (folMM <> heading) M.empty primitives
-  Database result _ _ <- foldM appendTheorem base theorems
-  TIO.writeFile (outputFile opts) (result <> "\n")
+  Database result _ _ <- foldM (appendTheorem format) base theorems
+  TIO.writeFile outputFile (result <> "\n")
 
   setSGR [SetColor Foreground Vivid Green]
   putStr $ "Success! File generated at: "
   setSGR [SetConsoleIntensity BoldIntensity]
-  putStr $ outputFile opts
+  putStr $ outputFile
   setSGR [Reset]
 
-appendTheorem :: Database -> Schema.Theorem -> IO Database
-appendTheorem (Database metamath facts lang) thm = do
+appendTheorem :: ProofFormat -> Database -> Schema.Theorem -> IO Database
+appendTheorem format (Database metamath facts lang) thm = do
   fitchProof@(FitchProof name _ _ _) <- either (fail . T.unpack) pure $ parseTheorem lang thm
   mmProof <-
     maybe
@@ -81,7 +104,10 @@ appendTheorem (Database metamath facts lang) thm = do
   when (M.member mmLabel facts) (fail $ "Duplicate label encountered: " <> T.unpack mmLabel)
   (printMistakes name) (proofMistakes mmProof)
   let options = defaultLayoutOptions
-  let proofText = renderStrict $ layoutSmart options (prettyProof mmProof)
+  let proofDoc = case format of
+        Normal -> prettyNormal mmProof
+        Packed -> prettyPacked $ packProof $ mmProof
+  let proofText = renderStrict $ layoutSmart options proofDoc
   let newDB = metamath <> "\n\n" <> proofText
   let newFacts = M.insert mmLabel (proofFact mmProof) facts
   return $ Database newDB newFacts lang

@@ -6,9 +6,10 @@ module FitchToMM.ProofWriter
   ( ProofWriter,
     Mistake (..),
     RpnStack,
-    RpnStep(..),
+    RpnStep (..),
     ProofProps (..),
     FHyp (..),
+    Label,
     proveMetavar,
     proveVar,
     proveStep,
@@ -26,6 +27,7 @@ module FitchToMM.ProofWriter
     DVR (..),
     reqDisjointFor,
     PropWriter,
+    getSteps,
   )
 where
 
@@ -51,9 +53,10 @@ data ProofProps = ProofProps (S.Set FHyp) (S.Set DVR)
 newtype RpnStack = RpnStack (D.DList (Maybe RpnStep))
   deriving (Show)
 
--- Arity and label
-data RpnStep = RpnStep Int T.Text
+data RpnStep = RpnStep Int Label
   deriving (Show)
+
+type Label = T.Text
 
 instance Semigroup RpnStack where
   (RpnStack a) <> (RpnStack b) = RpnStack $ a <> b
@@ -151,3 +154,6 @@ listStack :: RpnStack -> [T.Text]
 listStack (RpnStack stack) =
   let getLabel (RpnStep _ label) = label
    in map (maybe "?" getLabel) $ D.toList stack
+
+getSteps :: RpnStack -> [Maybe RpnStep]
+getSteps (RpnStack dlist) = D.toList dlist
