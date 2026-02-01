@@ -7,13 +7,14 @@ module FitchToMM.Pretty
     prettyTrm,
     prettyPacked,
     prettyNormal,
+    prettyCompressed,
   )
 where
 
 import Data.List ((\\))
 import qualified Data.Text as T
 import FitchToMM.Axioms
-import FitchToMM.Compressed (PackedProof (PackedProof), PackedStep (Backreference, PackedStep, UnknownStep))
+import FitchToMM.Compressed
 import FitchToMM.FitchProof
 import FitchToMM.MMProof
 import FitchToMM.Parser
@@ -38,6 +39,12 @@ prettyPacked (PackedProof name fact fHyps djVars rpnStack _) =
     prettyLabel (PackedStep (Just n) stepLabel) =
       pretty n <> ":" <> pretty stepLabel
     prettyLabel (PackedStep Nothing stepLabel) = pretty stepLabel
+
+prettyCompressed :: CompressedProof -> Doc a
+prettyCompressed (CompressedProof name fact fHyps djVars labels rpnStack _) =
+  let prettyStack = fillCat $ map pretty $ T.unpack rpnStack
+      prettyLabels = lparen <+> fillSep (map pretty labels) <+> rparen
+   in prettyProof name fact fHyps djVars (prettyLabels <+> prettyStack)
 
 prettyProof :: Label -> Fact -> [FHyp] -> [DVR] -> Doc a -> Doc a
 prettyProof name fact fHyps djVars prettyStack =

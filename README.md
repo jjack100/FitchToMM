@@ -34,7 +34,8 @@ Usage of the command is:
 Usage: fitch2mm [-f|--format FORMAT] [-o|--output OUTPUT_FILE] INPUT_FILE
 
 Available options:
-  -f,--format FORMAT       Output format: Normal or Packed (default: Normal)
+  -f,--format FORMAT       Output format: Normal, Packed, or Compressed
+                           (default: Compressed)
   -o,--output OUTPUT_FILE  File the generated Metamath will be written to
                            (default: "out.mm")
   -h,--help                Show this help text

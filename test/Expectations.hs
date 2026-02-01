@@ -14,6 +14,7 @@ import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
+import FitchToMM.Compressed (compressProof, packProof)
 import FitchToMM.FitchProof
 import FitchToMM.MMProof
 import FitchToMM.Parser
@@ -46,12 +47,18 @@ shouldBeRight (Right _) = pure ()
 
 verifyProof :: T.Text -> FitchProof -> Either String ()
 verifyProof base theorem@(FitchProof name _ _ _) = do
-  let mmProof = fromFitchProof (const Nothing) theorem
-  let metamath = pretty $ base <> sampleSyntaxMM
-  let full = renderString $ layoutCompact $ vsep [metamath, prettyNormal (fromJust mmProof)]
   let label = T.unpack $ "thm." <> name
+  -- Verify it in normal format
+  let mmProof = fromJust $ fromFitchProof (const Nothing) theorem
+  let metamath = pretty $ base <> sampleSyntaxMM
+  let full = renderString $ layoutCompact $ vsep [metamath, prettyNormal mmProof]
   (_, db) <- mmParseFromString full
   mmVerifiesLabel db label
+  -- Verify it in compressed format
+  let mmCompressed = compressProof $ packProof $ mmProof
+  let fullC = renderString $ layoutCompact $ vsep [metamath, prettyCompressed mmCompressed]
+  (_, dbC) <- mmParseFromString fullC
+  mmVerifiesLabel dbC label
 
 verifyWff :: T.Text -> Wff -> Either String ()
 verifyWff base wff = do

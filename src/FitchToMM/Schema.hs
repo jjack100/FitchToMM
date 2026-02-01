@@ -15,6 +15,7 @@ where
 
 import Control.Monad
 import Data.Aeson
+import Data.Char (isAlphaNum, isAscii)
 import qualified Data.Map.Strict as M
 import Data.OpenApi
 import qualified Data.Text as T
@@ -39,7 +40,7 @@ newtype MMLabel = MMLabel T.Text
 
 instance FromJSON MMLabel where
   parseJSON = withText "MMLabel" $ \txt -> do
-    let valid c = c >= '\x21' && c <= '\x7e' && c /= '$'
+    let valid c = isAscii c && (isAlphaNum c || elem c ("-._" :: String))
     unless (T.all valid txt) $ fail $ "Invalid characters in label: " <> T.unpack txt
     return $ MMLabel txt
 

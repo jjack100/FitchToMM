@@ -12,7 +12,7 @@ import Data.Foldable
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import FitchToMM.Compressed (packProof)
+import FitchToMM.Compressed (compressProof, packProof)
 import FitchToMM.FitchProof (FitchProof (FitchProof))
 import FitchToMM.MMProof
 import FitchToMM.Parser (Language, primitives)
@@ -35,7 +35,7 @@ instance FromJSON Collection
 
 data Database = Database T.Text (M.Map T.Text Fact) Language
 
-data ProofFormat = Normal | Packed
+data ProofFormat = Normal | Packed | Compressed
   deriving (Show, Read, Eq)
 
 data Options = Options
@@ -49,7 +49,8 @@ parseFormat :: String -> Either String ProofFormat
 parseFormat s = case map toLower s of
   "normal" -> Right Normal
   "packed" -> Right Packed
-  _ -> Left $ "Invalid format: " ++ s ++ ". Must be Normal or Packed"
+  "compressed" -> Right Compressed
+  _ -> Left $ "Invalid format: " ++ s ++ ". Must be Normal, Packed or Compressed"
 
 optionsParser :: Parser Options
 optionsParser =
@@ -58,10 +59,10 @@ optionsParser =
       (eitherReader parseFormat)
       ( long "format"
           <> short 'f'
-          <> value Normal
+          <> value Compressed
           <> showDefault
           <> metavar "FORMAT"
-          <> help "Output format: Normal or Packed"
+          <> help "Output format: Normal, Packed, or Compressed"
       )
     <*> strOption
       ( long "output"
@@ -107,6 +108,7 @@ appendTheorem format (Database metamath facts lang) thm = do
   let proofDoc = case format of
         Normal -> prettyNormal mmProof
         Packed -> prettyPacked $ packProof $ mmProof
+        Compressed -> prettyCompressed $ compressProof $ packProof mmProof
   let proofText = renderStrict $ layoutSmart options proofDoc
   let newDB = metamath <> "\n\n" <> proofText
   let newFacts = M.insert mmLabel (proofFact mmProof) facts

@@ -10,6 +10,8 @@ module FitchToMM.ProofWriter
     ProofProps (..),
     FHyp (..),
     Label,
+    DVR (..),
+    PropWriter,
     proveMetavar,
     proveVar,
     proveStep,
@@ -22,11 +24,10 @@ module FitchToMM.ProofWriter
     proveEllipsis,
     proveTrmMetavar,
     proveWffMetavar,
+    fHypLabel,
     markInternal,
     listStack,
-    DVR (..),
     reqDisjointFor,
-    PropWriter,
     getSteps,
   )
 where
@@ -93,12 +94,14 @@ data Mistake
 proveMetavar :: FHyp -> ProofWriter
 proveMetavar fhyp = do
   W.tell $ ProofProps (S.singleton fhyp) S.empty
-  proveStep $ RpnStep 0 $ case fhyp of
-    VarHyp l -> "var." <> l
-    TrmHyp l -> "trm." <> l
-    WffHyp l -> "wff." <> l
-    CtxHyp "..." -> "ctx.ellipsis"
-    CtxHyp l -> "ctx." <> l
+  proveStep $ RpnStep 0 $ fHypLabel fhyp
+
+fHypLabel :: FHyp -> Label
+fHypLabel (VarHyp l) = "var." <> l
+fHypLabel (TrmHyp l) = "trm." <> l
+fHypLabel (WffHyp l) = "wff." <> l
+fHypLabel (CtxHyp "...") = "ctx.ellipsis"
+fHypLabel (CtxHyp l) = "ctx." <> l
 
 {- Prefix a variable with an underscore to indicate it is used internally
    (i.e., used in the generated proof but not present in the Fitch proof) -}
