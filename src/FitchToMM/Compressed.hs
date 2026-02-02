@@ -1,4 +1,3 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module FitchToMM.Compressed
@@ -10,9 +9,9 @@ module FitchToMM.Compressed
   )
 where
 
-import Data.List (elemIndex, mapAccumR)
+import Data.List (mapAccumR)
 import qualified Data.Map.Strict as M
-import Data.Maybe (fromJust, mapMaybe)
+import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Vector.Unboxed as V
@@ -54,15 +53,21 @@ compressProof (PackedProof thmLabel fact optFHyps dvrs stack mistakes) =
   CompressedProof thmLabel fact optFHyps dvrs otherLabels compressed mistakes
   where
     (Fact _ mandFHyps mandEHyps _) = fact
+    -- Get the mandatory hypotheses of the proof
     fLabels = map fHypLabel mandFHyps
     eLabels = map (\n -> thmLabel <> "." <> T.show n) [1 .. length mandEHyps]
     mandLabels = fLabels ++ eLabels
-    allLabels = mapMaybe (\case PackedStep _ l -> Just l; _ -> Nothing) stack
-    otherLabels = S.toList $ S.difference (S.fromList allLabels) (S.fromList mandLabels)
-    labelList = mandLabels ++ otherLabels
-    asInt label = 1 + (fromJust $ elemIndex label labelList)
-    end = length labelList
-    compressed = T.concat $ map (encodeStep end asInt) stack
+    -- Separate them from the set of all other labels referenced (i.e., those
+    -- that will appear enclosed in parentheses in the compressed proof)
+    labelFromStep (PackedStep _ l) = Just l
+    labelFromStep _ = Nothing
+    allLabels = S.fromList $ mapMaybe labelFromStep stack
+    otherLabels = S.toList $ S.difference allLabels $ S.fromList mandLabels
+    -- Map them to the integers they are to be encoded as
+    labelMap = M.fromList $ zip (mandLabels ++ otherLabels) [1 ..]
+    end = M.size labelMap
+    -- And finally encode the integers as ASCII strings
+    compressed = T.concat $ map (encodeStep end (labelMap M.!)) stack
 
 encodeStep :: Int -> (Label -> Int) -> PackedStep -> T.Text
 encodeStep _ asInt (PackedStep Nothing label) = encodeInt $ asInt label
@@ -99,11 +104,15 @@ packTree packable tree = reverse steps
   where
     packSubproof :: TagMap -> ProofTree -> (TagMap, [PackedStep])
     packSubproof prevMap subprf@(ProofTreeSubproof label substeps)
+      -- If packable, check if already tagged
       | packable subprf = case lookupTag subprf tagMap of
+          -- Already seen: emit backreference
           Just tag -> (tagMap, [Backreference tag])
+          -- First time: tag it and emit full subproof
           Nothing ->
             let (n, newMap) = insertTree subprf tagMap
              in (newMap, PackedStep (Just n) label : concat newSteps)
+      -- Not packable: emit normally
       | otherwise = (tagMap, PackedStep Nothing label : concat newSteps)
       where
         (tagMap, newSteps) = mapAccumR packSubproof prevMap substeps
