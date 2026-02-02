@@ -8,10 +8,11 @@ module FitchToMM.Pretty
     prettyPacked,
     prettyNormal,
     prettyCompressed,
+    prettyFlat,
   )
 where
 
-import Data.List ((\\))
+import Data.List (zipWith4, (\\))
 import qualified Data.Text as T
 import FitchToMM.Axioms
 import FitchToMM.Compressed
@@ -20,6 +21,7 @@ import FitchToMM.MMProof
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import Prettyprinter
+import Prettyprinter.Render.Text (renderStrict)
 
 printProof :: MMProof -> IO ()
 printProof proof = print $ prettyNormal proof
@@ -106,6 +108,38 @@ prettyEHyp label (Condition Nothing hyp) =
     <+> "$e ; ... |-"
     <+> prettyWff hyp
     <+> "$."
+
+prettyFlat :: [FlatStep] -> T.Text
+prettyFlat steps =
+  T.intercalate "\n" $
+    zipWith4
+      (\num ctx wff just -> num <> " " <> ctx <> " ⊢ " <> wff <> " " <> just)
+      paddedNums
+      paddedCtxs
+      paddedWffs
+      justs
+  where
+    -- Print line numbers
+    nums = map T.show [1 .. length steps]
+    paddedNums = map (T.justifyRight (maximum $ map T.length nums) ' ') nums
+    -- Print context
+    printCtx ctx = T.intercalate ", " $ "Γ" : map (render . prettyWff) (reverse ctx)
+    ctxs = map (\(FlatStep ctx _ _ _ _) -> printCtx ctx) steps
+    paddedCtxs = map (T.justifyRight (maximum $ map T.length ctxs) ' ') ctxs
+    -- Print the expression
+    wffs = map (\(FlatStep _ wff _ _ _) -> render $ prettyWff wff) steps
+    paddedWffs = map (T.justifyLeft (maximum $ map T.length wffs) ' ') wffs
+    -- Print the justification for the step
+    justs = map (\(FlatStep _ _ just cites _) -> printJust just <> " " <> printCites cites) steps
+    printJust (Reference ref) = ref
+    printJust (Premise n) = "Premise #" <> T.show (n + 1)
+    printJust Assumption = "Assumption"
+    printJust Reiteration = "Reiteration"
+    -- Print the citations
+    printCites = T.intercalate ", " . map printCite
+    printCite (Line n) = T.show n
+    printCite (Range from to) = T.show (from + 1) <> "–" <> T.show (to + 1)
+    render = renderStrict . layoutPretty (LayoutOptions Unbounded)
 
 prettyWff :: Wff -> Doc a
 prettyWff (WffBinOp op lhs rhs) =

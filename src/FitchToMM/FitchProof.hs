@@ -43,8 +43,8 @@ flattenProof (FitchProof _ _ prems steps) = hyps ++ body
       [ FlatStep [] hyp (Premise i) [] [i]
       ]
     hypStep i (Condition (Just sup) hyp) =
-      [ FlatStep [] sup Assumption [] [0, i],
-        FlatStep [] hyp (Premise i) [] [1, i]
+      [ FlatStep [sup] sup Assumption [] [0, i],
+        FlatStep [sup] hyp (Premise i) [] [1, i]
       ]
 
 flattenSteps :: Context -> [Int] -> Int -> [FitchStep] -> [FlatStep]
