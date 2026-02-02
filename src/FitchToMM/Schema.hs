@@ -10,6 +10,7 @@ module FitchToMM.Schema
     Fact,
     parseTheorem,
     parseFact,
+    getName,
   )
 where
 
@@ -89,6 +90,9 @@ data EHyp = EHyp
   }
   deriving stock (Generic)
   deriving anyclass (ToSchema, FromJSON)
+
+getName :: Theorem -> T.Text
+getName (Theorem (MMLabel thmName) _ _ _) = thmName
 
 parseTheorem :: Language -> Theorem -> Either T.Text F.FitchProof
 parseTheorem l (Theorem (MMLabel thmName) thmAllowedSubs thmPrems thmSteps) = do

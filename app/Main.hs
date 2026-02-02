@@ -3,17 +3,17 @@
 
 module Main (main) where
 
+import Control.Exception (finally)
 import Control.Monad (foldM, when)
-import Data.Aeson (FromJSON)
-import Data.Aeson.Decoding
+import Data.Aeson (FromJSON, eitherDecode)
 import qualified Data.ByteString.Lazy as BL
 import Data.Char
-import Data.Foldable
+import Data.Foldable (find, traverse_)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import FitchToMM.Compressed (compressProof, packProof)
-import FitchToMM.FitchProof (FitchProof (FitchProof))
+import FitchToMM.FitchProof (FitchProof (FitchProof), flattenProof)
 import FitchToMM.MMProof
 import FitchToMM.Parser (Language, primitives)
 import FitchToMM.Pretty
@@ -26,7 +26,8 @@ import Paths_fitch_to_mm
 import Prettyprinter
 import Prettyprinter.Render.Text
 import System.Console.ANSI
-import System.IO
+import System.Exit (exitFailure)
+import System.IO (Handle, stderr, stdout)
 
 data Collection = Collection [Schema.Theorem]
   deriving (Generic)
@@ -39,10 +40,13 @@ data ProofFormat = Normal | Packed | Compressed
   deriving (Show, Read, Eq)
 
 data Options = Options
-  { optFormat :: ProofFormat,
-    optOutputFile :: FilePath,
-    optInputFile :: FilePath
+  { optOutputFile :: FilePath,
+    optFormat :: ProofFormat,
+    optDisplay :: Maybe T.Text
   }
+  deriving (Show)
+
+data Input = Input Options FilePath
   deriving (Show)
 
 parseFormat :: String -> Either String ProofFormat
@@ -52,10 +56,24 @@ parseFormat s = case map toLower s of
   "compressed" -> Right Compressed
   _ -> Left $ "Invalid format: " ++ s ++ ". Must be Normal, Packed or Compressed"
 
+inputParser :: Parser Input
+inputParser =
+  Input
+    <$> (optionsParser)
+    <*> strArgument (metavar "INPUT_FILE")
+
 optionsParser :: Parser Options
 optionsParser =
   Options
-    <$> option
+    <$> strOption
+      ( long "output"
+          <> short 'o'
+          <> value "out.mm"
+          <> showDefault
+          <> metavar "OUTPUT_FILE"
+          <> help "File the generated Metamath will be written to"
+      )
+    <*> option
       (eitherReader parseFormat)
       ( long "format"
           <> short 'f'
@@ -64,45 +82,62 @@ optionsParser =
           <> metavar "FORMAT"
           <> help "Output format: Normal, Packed, or Compressed"
       )
-    <*> strOption
-      ( long "output"
-          <> short 'o'
-          <> value "out.mm"
-          <> showDefault
-          <> metavar "OUTPUT_FILE"
-          <> help "File the generated Metamath will be written to"
+    <*> optional
+      ( T.pack
+          <$> strOption
+            ( long "display"
+                <> short 'd'
+                <> metavar "THEOREM_NAME"
+                <> help "Display a specific theorem instead of generating Metamath"
+            )
       )
-    <*> strArgument (metavar "INPUT_FILE")
 
 main :: IO ()
 main = do
-  Options format outputFile inputFile <-
-    execParser $ info (optionsParser <**> helper) fullDesc
+  Input options inputFile <-
+    execParser $ info (inputParser <**> helper) briefDesc
   content <- BL.readFile inputFile
+  collection <- either (errorOut . T.pack) pure $ eitherDecode content
+  case optDisplay options of
+    Nothing ->
+      generateDatabase
+        (T.pack inputFile)
+        collection
+        (optFormat options)
+        (optOutputFile options)
+    Just thmName -> displayTheorem thmName collection
+
+generateDatabase :: T.Text -> Collection -> ProofFormat -> FilePath -> IO ()
+generateDatabase name (Collection theorems) format outputFile = do
+  let heading = "\n\n" <> (makeHeading name)
   folPath <- getDataFileName "fol.mm"
   folMM <- TIO.readFile folPath
-  Collection theorems <- either fail pure $ eitherDecode content
-  let heading = "\n\n" <> (makeHeading $ T.pack inputFile)
   let base = Database (folMM <> heading) M.empty primitives
   Database result _ _ <- foldM (appendTheorem format) base theorems
   TIO.writeFile outputFile (result <> "\n")
 
-  setSGR [SetColor Foreground Vivid Green]
-  putStr $ "Success! File generated at: "
-  setSGR [SetConsoleIntensity BoldIntensity]
-  putStr $ outputFile
-  setSGR [Reset]
+  withColor stdout Vivid Green $ do
+    TIO.putStr $ "Success! File generated at: "
+    withBold stdout $ putStrLn outputFile
+
+displayTheorem :: T.Text -> Collection -> IO ()
+displayTheorem thmName (Collection theorems) = do
+  theorem <-
+    try
+      (find (\thm -> Schema.getName thm == thmName) theorems)
+      ("Theorem not found: " <> thmName)
+  fitchProof <- either errorOut pure $ parseTheorem primitives theorem
+  TIO.putStrLn $ prettyFlat $ flattenProof fitchProof
 
 appendTheorem :: ProofFormat -> Database -> Schema.Theorem -> IO Database
 appendTheorem format (Database metamath facts lang) thm = do
-  fitchProof@(FitchProof name _ _ _) <- either (fail . T.unpack) pure $ parseTheorem lang thm
+  fitchProof@(FitchProof name _ _ _) <- either errorOut pure $ parseTheorem lang thm
   mmProof <-
-    maybe
-      (fail $ "Empty theorem: " <> T.unpack name)
-      pure
+    try
       (fromFitchProof ((M.!?) facts) fitchProof)
+      ("Empty theorem: " <> name)
   let mmLabel = proofLabel mmProof
-  when (M.member mmLabel facts) (fail $ "Duplicate label encountered: " <> T.unpack mmLabel)
+  when (M.member mmLabel facts) (errorOut $ "Duplicate label encountered: " <> mmLabel)
   (printMistakes name) (proofMistakes mmProof)
   let options = defaultLayoutOptions
   let proofDoc = case format of
@@ -116,21 +151,19 @@ appendTheorem format (Database metamath facts lang) thm = do
 
 printMistakes :: T.Text -> [(Int, Mistake)] -> IO ()
 printMistakes _ [] = pure ()
-printMistakes thm mistakes = do
-  hSetSGR stderr [SetColor Foreground Dull Yellow]
-  TIO.hPutStr stderr $ "Warning: Mistakes were found in "
-  hSetSGR stderr [SetItalicized True]
-  TIO.hPutStr stderr thm
-  hSetSGR stderr [SetItalicized False]
+printMistakes thm mistakes = withColor stderr Dull Yellow $ do
+  -- Print warning message
+  withBold stderr $ TIO.hPutStr stderr $ "Warning: "
+  TIO.hPutStr stderr $ "Mistakes were found in "
+  withItalics stderr $ TIO.hPutStr stderr thm
   TIO.hPutStrLn stderr $ ". The generated proof may be incomplete."
+  -- List mistakes
   traverse_ (uncurry printMistake) mistakes
-  TIO.hPutStr stderr "\n"
   hSetSGR stderr [Reset]
   where
     printMistake :: Int -> Mistake -> IO ()
     printMistake i mistake =
-      TIO.hPutStrLn stderr $
-        "\tStep " <> (T.show (i + 1)) <> ": " <> (describe mistake)
+      TIO.hPutStrLn stderr $ "\tStep " <> (T.show (i + 1)) <> ": " <> (describe mistake)
     describe :: Mistake -> T.Text
     describe BadAssumption = "Malformed assumption"
     describe BadCiteCount = "Cites the wrong number of lines"
@@ -154,3 +187,35 @@ makeHeading text =
     <> T.replicate 80 "-"
     <> "\n"
     <> "$)"
+
+try :: Maybe a -> T.Text -> IO a
+try result msg = maybe (errorOut msg) pure result
+
+errorOut :: T.Text -> IO a
+errorOut msg = withColor stderr Vivid Red $ do
+  withBold stderr $ TIO.hPutStr stderr "Error: "
+  TIO.hPutStrLn stderr msg
+  exitFailure
+
+-- ANSI escape sequence helpers
+
+withColor :: Handle -> ColorIntensity -> Color -> IO a -> IO a
+withColor h intensity color ioAction = do
+  useANSI <- hSupportsANSI h
+  let set = hSetSGR h [SetColor Foreground intensity color]
+      reset = hSetSGR h [SetDefaultColor Foreground]
+  if useANSI then set >> ioAction `finally` reset else ioAction
+
+withBold :: Handle -> IO a -> IO a
+withBold h ioAction = do
+  useANSI <- hSupportsANSI h
+  let set = hSetSGR h [SetConsoleIntensity BoldIntensity]
+      reset = hSetSGR h [SetConsoleIntensity NormalIntensity]
+  if useANSI then set >> ioAction `finally` reset else ioAction
+
+withItalics :: Handle -> IO a -> IO a
+withItalics h ioAction = do
+  useANSI <- hSupportsANSI h
+  let set = hSetSGR h [SetItalicized True]
+      reset = hSetSGR h [SetItalicized False]
+  if useANSI then set >> ioAction `finally` reset else ioAction

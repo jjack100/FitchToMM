@@ -137,7 +137,7 @@ prettyFlat steps =
     printJust Reiteration = "Reiteration"
     -- Print the citations
     printCites = T.intercalate ", " . map printCite
-    printCite (Line n) = T.show n
+    printCite (Line n) = T.show (n + 1)
     printCite (Range from to) = T.show (from + 1) <> "–" <> T.show (to + 1)
     render = renderStrict . layoutPretty (LayoutOptions Unbounded)
 

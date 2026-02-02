@@ -31,18 +31,21 @@ The resulting executable will be under `./result/bin/fitch2mm`.
 `fitch2mm` can be passed a JSON file to be read (see the `examples` directory for what format is expected).
 Usage of the command is:
 ```
-Usage: fitch2mm [-f|--format FORMAT] [-o|--output OUTPUT_FILE] INPUT_FILE
+fitch2mm [OPTIONS] INPUT_FILE
 
 Available options:
-  -f,--format FORMAT       Output format: Normal, Packed, or Compressed
-                           (default: Compressed)
   -o,--output OUTPUT_FILE  File the generated Metamath will be written to
                            (default: "out.mm")
+  -f,--format FORMAT       Output format: Normal, Packed, or Compressed
+                           (default: Compressed)
+  -d,--display THEOREM_NAME
+                           Display a specific theorem instead of generating
+                           Metamath
   -h,--help                Show this help text
 ```
 For example, to read the theorems from the `examples` directory:
 ```
-./result/bin/fitch2mm ./examples/theorems.json --output example.mm
+./result/bin/fitch2mm -o example.mm ./examples/theorems.json
 ```
 This will generate the output `example.mm` in the current directory.
 If any mistakes are encountered, it will emit warnings but still try to generate the rest of the proof, inserting `?`s in place of the problematic steps.
