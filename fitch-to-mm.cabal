@@ -67,17 +67,17 @@ library
   -- other-extensions:
   -- Other library packages from which modules are imported.
   build-depends:
+    aeson >=2.2.3 && <2.3,
     base ^>=4.20.2.0,
-    aeson >= 2.2.3 && < 2.3,
-    containers >= 0.7 && < 0.8,
-    dlist >= 1.0 && < 1.1,
-    mtl >= 2.3.1 && < 2.4,
-    openapi3 >= 3.2.4 && < 3.3,
-    parsec >= 3.1.18 && < 3.2,
-    prettyprinter >= 1.7.1 && < 1.8,
+    containers >=0.7 && <0.8,
+    dlist >=1.0 && <1.1,
+    mtl >=2.3.1 && <2.4,
+    openapi3 >=3.2.4 && <3.3,
+    parsec >=3.1.18 && <3.2,
+    prettyprinter >=1.7.1 && <1.8,
     semigroups,
-    text >= 2.1.3 && < 2.2,
-    vector >= 0.13.2 && < 0.14,
+    text >=2.1.3 && <2.2,
+    vector >=0.13.2 && <0.14,
 
   -- Directories containing source files.
   hs-source-dirs: src
@@ -91,6 +91,7 @@ executable fitch2mm
   main-is: Main.hs
   -- Modules included in this executable, other than Main.
   other-modules:
+    Display
     Paths_fitch_to_mm
 
   -- LANGUAGE extensions used by modules in this package.

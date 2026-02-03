@@ -3,15 +3,14 @@
 
 module Main (main) where
 
-import Control.Exception (finally)
 import Control.Monad (foldM, when)
 import Data.Aeson (FromJSON, eitherDecode)
 import qualified Data.ByteString.Lazy as BL
-import Data.Char
 import Data.Foldable (find, traverse_)
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
+import Display
 import FitchToMM.Compressed (compressProof, packProof)
 import FitchToMM.FitchProof (FitchProof (FitchProof), flattenProof)
 import FitchToMM.MMProof
@@ -27,7 +26,7 @@ import Prettyprinter
 import Prettyprinter.Render.Text
 import System.Console.ANSI
 import System.Exit (exitFailure)
-import System.IO (Handle, stderr, stdout)
+import System.IO (stderr, stdout)
 
 data Collection = Collection [Schema.Theorem]
   deriving (Generic)
@@ -37,75 +36,73 @@ instance FromJSON Collection
 data Database = Database T.Text (M.Map T.Text Fact) Language
 
 data ProofFormat = Normal | Packed | Compressed
-  deriving (Show, Read, Eq)
 
-data Options = Options
-  { optOutputFile :: FilePath,
-    optFormat :: ProofFormat,
-    optDisplay :: Maybe T.Text
-  }
-  deriving (Show)
+data DisplayStyle = Fitch | Sequent
 
-data Input = Input Options FilePath
-  deriving (Show)
+data Options
+  = OutputOptions FilePath ProofFormat
+  | DisplayOptions T.Text DisplayStyle
 
-parseFormat :: String -> Either String ProofFormat
-parseFormat s = case map toLower s of
-  "normal" -> Right Normal
-  "packed" -> Right Packed
-  "compressed" -> Right Compressed
-  _ -> Left $ "Invalid format: " ++ s ++ ". Must be Normal, Packed or Compressed"
+data Args = Args Options FilePath
 
-inputParser :: Parser Input
-inputParser =
-  Input
-    <$> (optionsParser)
+outputOptionsParser :: Parser Options
+outputOptionsParser =
+  parserOptionGroup "Output Mode Options" $
+    OutputOptions
+      <$> strOption
+        ( long "output"
+            <> short 'o'
+            <> value "out.mm"
+            <> showDefault
+            <> metavar "OUTPUT_FILE"
+            <> help "File the generated Metamath will be written to"
+        )
+      <*> formatParser
+
+formatParser :: Parser ProofFormat
+formatParser =
+  flag Compressed Normal (long "normal" <> short 'n' <> hidden <> help "Output normal (uncompressed) format")
+    <|> flag Compressed Packed (long "packed" <> short 'p' <> hidden <> help "Output packed format")
+    <|> flag Compressed Compressed (long "compressed" <> short 'c' <> hidden <> help "Output compressed format (default)")
+
+displayOptionsParser :: Parser Options
+displayOptionsParser =
+  parserOptionGroup "Display Mode Options" $
+    DisplayOptions
+      <$> strOption
+        ( long "display"
+            <> short 'd'
+            <> metavar "PROOF_NAME"
+            <> help "Display a specific proof instead of generating Metamath"
+        )
+      <*> styleParser
+
+styleParser :: Parser DisplayStyle
+styleParser =
+  flag Fitch Fitch (long "fitch" <> short 'f' <> hidden <> help "Show displayed proof in Fitch-style (default)")
+    <|> flag Fitch Sequent (long "sequent" <> short 's' <> hidden <> help "Show displayed proof in sequent style")
+
+argsParser :: Parser Args
+argsParser =
+  Args
+    <$> (outputOptionsParser <|> displayOptionsParser)
     <*> strArgument (metavar "INPUT_FILE")
-
-optionsParser :: Parser Options
-optionsParser =
-  Options
-    <$> strOption
-      ( long "output"
-          <> short 'o'
-          <> value "out.mm"
-          <> showDefault
-          <> metavar "OUTPUT_FILE"
-          <> help "File the generated Metamath will be written to"
-      )
-    <*> option
-      (eitherReader parseFormat)
-      ( long "format"
-          <> short 'f'
-          <> value Compressed
-          <> showDefault
-          <> metavar "FORMAT"
-          <> help "Output format: Normal, Packed, or Compressed"
-      )
-    <*> optional
-      ( T.pack
-          <$> strOption
-            ( long "display"
-                <> short 'd'
-                <> metavar "THEOREM_NAME"
-                <> help "Display a specific theorem instead of generating Metamath"
-            )
-      )
 
 main :: IO ()
 main = do
-  Input options inputFile <-
-    execParser $ info (inputParser <**> helper) briefDesc
+  Args options inputFile <-
+    execParser $ info (argsParser <**> helper) briefDesc
   content <- BL.readFile inputFile
   collection <- either (errorOut . T.pack) pure $ eitherDecode content
-  case optDisplay options of
-    Nothing ->
+  case options of
+    (OutputOptions outputFile format) ->
       generateDatabase
         (T.pack inputFile)
         collection
-        (optFormat options)
-        (optOutputFile options)
-    Just thmName -> displayTheorem thmName collection
+        format
+        outputFile
+    (DisplayOptions thmName dispStyle) ->
+      displayTheorem thmName collection dispStyle
 
 generateDatabase :: T.Text -> Collection -> ProofFormat -> FilePath -> IO ()
 generateDatabase name (Collection theorems) format outputFile = do
@@ -120,14 +117,16 @@ generateDatabase name (Collection theorems) format outputFile = do
     TIO.putStr $ "Success! File generated at: "
     withBold stdout $ putStrLn outputFile
 
-displayTheorem :: T.Text -> Collection -> IO ()
-displayTheorem thmName (Collection theorems) = do
+displayTheorem :: T.Text -> Collection -> DisplayStyle -> IO ()
+displayTheorem thmName (Collection theorems) dispStyle = do
   theorem <-
     try
       (find (\thm -> Schema.getName thm == thmName) theorems)
       ("Theorem not found: " <> thmName)
   fitchProof <- either errorOut pure $ parseTheorem primitives theorem
-  TIO.putStrLn $ prettyFlat $ flattenProof fitchProof
+  TIO.putStrLn $ case dispStyle of
+    Fitch -> prettyFitch $ fitchProof
+    Sequent -> prettyFlat thmName (flattenProof fitchProof)
 
 appendTheorem :: ProofFormat -> Database -> Schema.Theorem -> IO Database
 appendTheorem format (Database metamath facts lang) thm = do
@@ -196,26 +195,3 @@ errorOut msg = withColor stderr Vivid Red $ do
   withBold stderr $ TIO.hPutStr stderr "Error: "
   TIO.hPutStrLn stderr msg
   exitFailure
-
--- ANSI escape sequence helpers
-
-withColor :: Handle -> ColorIntensity -> Color -> IO a -> IO a
-withColor h intensity color ioAction = do
-  useANSI <- hSupportsANSI h
-  let set = hSetSGR h [SetColor Foreground intensity color]
-      reset = hSetSGR h [SetDefaultColor Foreground]
-  if useANSI then set >> ioAction `finally` reset else ioAction
-
-withBold :: Handle -> IO a -> IO a
-withBold h ioAction = do
-  useANSI <- hSupportsANSI h
-  let set = hSetSGR h [SetConsoleIntensity BoldIntensity]
-      reset = hSetSGR h [SetConsoleIntensity NormalIntensity]
-  if useANSI then set >> ioAction `finally` reset else ioAction
-
-withItalics :: Handle -> IO a -> IO a
-withItalics h ioAction = do
-  useANSI <- hSupportsANSI h
-  let set = hSetSGR h [SetItalicized True]
-      reset = hSetSGR h [SetItalicized False]
-  if useANSI then set >> ioAction `finally` reset else ioAction

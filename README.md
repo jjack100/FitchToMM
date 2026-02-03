@@ -31,16 +31,22 @@ The resulting executable will be under `./result/bin/fitch2mm`.
 `fitch2mm` can be passed a JSON file to be read (see the `examples` directory for what format is expected).
 Usage of the command is:
 ```
-fitch2mm [OPTIONS] INPUT_FILE
+Usage: fitch2mm [[-o|--output OUTPUT_FILE] | (-d|--display PROOF_NAME)] INPUT_FILE
 
-Available options:
+Output Mode Options
   -o,--output OUTPUT_FILE  File the generated Metamath will be written to
                            (default: "out.mm")
-  -f,--format FORMAT       Output format: Normal, Packed, or Compressed
-                           (default: Compressed)
-  -d,--display THEOREM_NAME
-                           Display a specific theorem instead of generating
+  -n,--normal              Output normal (uncompressed) format
+  -p,--packed              Output packed format
+  -c,--compressed          Output compressed format (default)
+
+Display Mode Options
+  -d,--display PROOF_NAME  Display a specific proof instead of generating
                            Metamath
+  -f,--fitch               Show displayed proof in Fitch-style (default)
+  -s,--sequent             Show displayed proof in sequent style
+
+Available options:
   -h,--help                Show this help text
 ```
 For example, to read the theorems from the `examples` directory:
