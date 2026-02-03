@@ -402,100 +402,24 @@ ${ $( Definiendum Elimination $)
   axm.def-elim   $a ; ... |- psi $.
 $}
 
-$( -------- Logical Equivalence & Rules of Replacement --------
+$( -------- Substitution as an Operator --------
 
-  If two WFFs are logically equivalent, they can generally be swapped for one
-  another in any arbitrary formula without affecting its truth-value. This
-  allows us to express "rules of replacement" that allow us to infer a new
-  statement by replacing some segments of it with logically equivalent ones.
-
-  Compared to the other rules of inference, these have the advantage of being
-  able to operate on not just on the whole formula but also on subformulae.
-  This is considered a "conservative extension" because it does not enable
-  proving any new statements that we could not already prove; it is
-  demonstrable as a metatheorem that if we have a proof using rules of
-  replacement, there also exists a (potentially longer) proof of the same fact
-  without them. However, it can nevertheless be useful, because it can shorten
-  proofs by sparing us from having to dis- and reassemble an entire formula to
-  change only part of it.
-
-  Rules of replacement will be subject to the same capture-avoidance condition
-  as proper substitution, so we will first define a new metalogical predicate
-  similar to our previous "replaces" predicate. To distinguish them (and to
-  emphasize the bidirectionality of the rules involving it), we will use the
-  term "swaps".
+  Up until now we have been expressing proper substitution with a metalogical
+  "REPLACES" predicate that relates a WFF to the one obtained by its
+  subtitution. However, it will be convenient to have a way of representing it 
+  _within_ formulae (corresponding to the common notation [t/x] to mean
+  "substitute t for x").
 $)
 
-$c SWAPS === $.
-stmt.swp $a stmt phi_1 SWAPS psi_1 IN phi_2 WITH psi_2 $.
-stmt.eqv $a stmt phi === psi $.
+$c sub $.
 
-$( Our formalization of substitution reprised: $)
+wff.sub $a wff ( sub trm_1 x phi ) $.
 
-$( psi is swapped if it is the WFF in question $)
-swp.rep $a ; phi SWAPS psi IN psi WITH phi $.
-
-$( Rules of replacement permit swapping only some occurrences, so leaving phi
-   unchanged is always allowed. $)
-swp.none $a ; phi SWAPS psi IN phi WITH chi $.
-
-${ $( Define for the logical connectives $)
-  swp.con.1  $e ; phi_1 SWAPS chi_1 IN phi_2 WITH chi_2 $.
-  swp.con.2  $e ; psi_1 SWAPS chi_1 IN psi_2 WITH chi_2 $.
-
-  swp.and     $a ; ( and phi_1 psi_1 )     SWAPS chi_1 IN ( and phi_2 psi_2 )     WITH chi_2 $.
-  swp.or      $a ; ( or phi_1 psi_1 )      SWAPS chi_1 IN ( or phi_2 psi_2 )      WITH chi_2 $.
-  swp.implies $a ; ( implies phi_1 psi_1 ) SWAPS chi_1 IN ( implies phi_2 psi_2 ) WITH chi_2 $.
-  swp.iff     $a ; ( iff phi_1 psi_1 )     SWAPS chi_1 IN ( iff phi_2 psi_2 )     WITH chi_2 $.
-$} ${
-  swp.not.1 $e ; phi_1 SWAPS psi_1 IN phi_2 WITH psi_2 $.
-  swp.not   $a ; ( not phi_1 ) SWAPS psi_1 IN ( not phi_2 ) WITH psi_2 $.
-$}
-
-${ $( And for quantifiers $)
-  $d x psi_2 $. $( Avoid variable capture $)
-  $d x psi_1 $. $( Avoid replacing bound occurrences $)
-  swp.qnt.1 $e ; phi_1 SWAPS psi_1 IN phi_2 WITH psi_2 $.
-  swp.qnt   $a ; ( qnt_1 x phi_1 ) SWAPS psi_1 IN ( qnt_1 x phi_2 ) WITH psi_2 $.
-  $( Note: the $d conditions here are a bit overly restrictive in that it also
-     rejects bound occurrences of x in psi_2, but this is only a problem if x
-     would end up shadowed, which we will avoid as a matter of style anyway. $)
-$}
-
-$( Equivalence Introduction
-   Two WFFs are logically equivalent if their material biconditional is a
-   tautology (i.e., provable in the empty context ). $)
+$( Define substitution $)
 ${
-  axm.eqv-intr.1 $e ; |- ( iff phi psi ) $.
-  axm.eqv-intr   $a ; phi === psi $.
+  def.sub.1 $e ; psi REPLACES x IN phi WITH trm_1 $.
+  def.sub   $a ; ( sub trm_1 x phi ) := psi $.
 $}
 
-${ $( Equivalence Elimination $)
-  axm.eqv-elim-1.1 $e ; phi_1 SWAPS psi_1 IN phi_2 WITH psi_2  $.
-  axm.eqv-elim-1.2 $e ; psi_1 === psi_2 $.
-  axm.eqv-elim-1.3 $e ; ... |- phi_1 $.
-  axm.eqv-elim-1   $a ; ... |- phi_2 $.
-$} ${ 
-  axm.eqv-elim-2.1 $e ; phi_1 SWAPS psi_1 IN phi_2 WITH psi_2  $.
-  axm.eqv-elim-2.2 $e ; psi_1 === psi_2 $.
-  axm.eqv-elim-2.3 $e ; ... |- phi_2 $.
-  axm.eqv-elim-2   $a ; ... |- phi_1 $.
-$}
-
-$( We can now prove that if two WFFs are equivalent by definition, they can be
-   eliminated in the same way $)
-${
-  thm.def-eqv-1.1 $e ; phi_1 SWAPS psi_1 IN phi_2 WITH psi_2  $.
-  thm.def-eqv-1.2 $e ; psi_1 := psi_2 $.
-  thm.def-eqv-1.3 $e ; ... |- phi_1 $.
-  thm.def-eqv-1   $p ; ... |- phi_2 $=
-    ( ctx.empty axm.def-elim axm.def-intr axm.iff-intr axm.eqv-elim-1 ctx.append
-    axm.assume axm.eqv-intr ) ABCDEFCEICEICNCEGICOJIENCEGIEOKLPHM $.
-$} ${ 
-  thm.def-eqv-2.1 $e ; phi_1 SWAPS psi_1 IN phi_2 WITH psi_2  $.
-  thm.def-eqv-2.2 $e ; psi_1 := psi_2 $.
-  thm.def-eqv-2.3 $e ; ... |- phi_2 $.
-  thm.def-eqv-2   $p ; ... |- phi_1 $=
-    ( ctx.empty axm.def-elim axm.def-intr axm.iff-intr axm.eqv-elim-2 ctx.append
-    axm.assume axm.eqv-intr ) ABCDEFCEICEICNCEGICOJIENCEGIEOKLPHM $.
-$}
+$( And extend our REPLACES predicate to be able to use it $)
+sub.sub $a ; ( sub trm_1 x phi ) REPLACES x IN phi WITH trm_1 $.
