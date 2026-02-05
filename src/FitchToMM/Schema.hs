@@ -126,7 +126,7 @@ parseFact l fact = do
     )
 
 parseDVR :: (FHyp, FHyp) -> PW.DVR
-parseDVR (x, y) = PW.DVR (parseFHyp x) (parseFHyp y)
+parseDVR (x, y) = PW.mkDVR (parseFHyp x) (parseFHyp y)
 
 parseFHyp :: FHyp -> PW.FHyp
 parseFHyp (VarHyp txt) = PW.VarHyp txt

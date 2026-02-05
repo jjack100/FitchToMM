@@ -421,5 +421,12 @@ ${
   def.sub   $a ; ( sub trm_1 x phi ) := psi $.
 $}
 
-$( And extend our REPLACES predicate to be able to use it $)
-sub.sub $a ; ( sub trm_1 x phi ) REPLACES x IN phi WITH trm_1 $.
+$( This new syntax does not fit the mold of function/predicate/constant so we
+   must also extend the replacement predicate itself to recurse through it $)
+sub.sub-1 $a ; ( sub trm_1 x phi ) REPLACES x IN phi WITH trm_1 $.
+${
+  $d y trm_3 $. $d x y $.
+  sub.sub-2.1 $e ; trm_1 REPLACES x IN trm_2 WITH trm_3 $.
+  sub.sub-2.2 $e ; phi REPLACES x IN psi WITH trm_3 $.
+  sub.sub-2   $a ; ( sub trm_1 y phi ) REPLACES x IN ( sub trm_2 y psi ) WITH trm_3 $.
+$} 

@@ -52,7 +52,12 @@ matchTo (WffQnt q v w) (WffQnt q' v' w') | q == q' = do
   merge wffSub (singletonVar v' v)
 matchTo (WffAtom p args) (WffAtom p' args') | p == p' = do
   argSubs <- zipWithM matchToTrm args args'
-  foldM merge empty argSubs
+  mergeFold argSubs
+matchTo (WffSub t v w) (WffSub t' v' w') = do
+  trmSub <- matchToTrm t t'
+  let varSub = singletonVar v v'
+  wffSub <- matchTo w w'
+  mergeFold [trmSub, varSub, wffSub]
 -- Otherwise the match fails
 matchTo _ _ = Nothing
 
@@ -66,7 +71,7 @@ matchToTrm (TrmConst c) (TrmConst c') | c == c' = Just empty
 -- Handle subexpressions recursively
 matchToTrm (TrmFunc f args) (TrmFunc f' args') | f == f' = do
   argSubs <- zipWithM matchToTrm args args'
-  foldM merge empty argSubs
+  mergeFold argSubs
 -- Otherwise the match fails
 matchToTrm _ _ = Nothing
 
@@ -79,13 +84,13 @@ mergeFold :: [Substitution] -> Maybe Substitution
 mergeFold = foldM merge empty
 
 checkDisjoint :: Substitution -> DVR -> Maybe (S.Set DVR)
-checkDisjoint (Substitution u) (DVR d1 d2)
-  | Just e1 <- u M.!? fHypName d1,
-    Just e2 <- u M.!? fHypName d2 = do
+checkDisjoint (Substitution u) (DVR v1 v2)
+  | Just e1 <- u M.!? fHypName v1,
+    Just e2 <- u M.!? fHypName v2 = do
       let vars1 = varsIn e1
       let vars2 = varsIn e2
       guard $ S.disjoint vars1 vars2
-      return $ S.map (uncurry DVR) (S.cartesianProduct vars1 vars2)
+      return $ S.map (uncurry mkDVR) (S.cartesianProduct vars1 vars2)
 checkDisjoint _ _ = Just S.empty
 
 checkDisjoints :: Substitution -> [DVR] -> Maybe (S.Set DVR)
@@ -141,6 +146,8 @@ varsInWff WffFalse = S.empty
 varsInWff (WffQnt _ x wff) = S.insert (VarHyp x) (varsInWff wff)
 varsInWff (WffAtom _ args) = varsInLst args
 varsInWff (WffMetavar var) = S.singleton $ WffHyp var
+varsInWff (WffSub trm x wff) =
+  S.insert (VarHyp x) (varsInTrm trm <> varsInWff wff)
 
 varsInLst :: [Term] -> S.Set FHyp
 varsInLst = foldMap' varsInTrm

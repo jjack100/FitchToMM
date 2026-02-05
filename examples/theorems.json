@@ -16,26 +16,15 @@
                 "tag": "ProofStep",
                 "expression": "( or phi ( not phi ) )",
                 "rule": "axm.or-intr",
-                "cites": [
-                  {
-                    "tag": "Line",
-                    "contents": 2
-                  }
-                ]
+                "cites": [{ "tag": "Line", "contents": 2 }]
               },
               {
                 "tag": "ProofStep",
                 "expression": "false",
                 "rule": "axm.not-elim",
                 "cites": [
-                  {
-                    "tag": "Line",
-                    "contents": 3
-                  },
-                  {
-                    "tag": "Line",
-                    "contents": 1
-                  }
+                  { "tag": "Line", "contents": 3 },
+                  { "tag": "Line", "contents": 1 }
                 ]
               }
             ]
@@ -44,40 +33,21 @@
             "tag": "ProofStep",
             "expression": "( not phi )",
             "rule": "axm.not-intr",
-            "cites": [
-              {
-                "tag": "Range",
-                "contents": [
-                  2,
-                  4
-                ]
-              }
-            ]
+            "cites": [{ "tag": "Range", "contents": [2, 4] }]
           },
           {
             "tag": "ProofStep",
             "expression": "( or phi ( not phi ) )",
             "rule": "axm.or-intr",
-            "cites": [
-              {
-                "tag": "Line",
-                "contents": 5
-              }
-            ]
+            "cites": [{ "tag": "Line", "contents": 5 }]
           },
           {
             "tag": "ProofStep",
             "expression": "false",
             "rule": "axm.not-elim",
             "cites": [
-              {
-                "tag": "Line",
-                "contents": 6
-              },
-              {
-                "tag": "Line",
-                "contents": 1
-              }
+              { "tag": "Line", "contents": 6 },
+              { "tag": "Line", "contents": 1 }
             ]
           }
         ]
@@ -86,15 +56,7 @@
         "tag": "ProofStep",
         "expression": "( or phi ( not phi ) )",
         "rule": "axm.ip",
-        "cites": [
-          {
-            "tag": "Range",
-            "contents": [
-              1,
-              7
-            ]
-          }
-        ]
+        "cites": [{ "tag": "Range", "contents": [1, 7] }]
       }
     ]
   },
@@ -102,12 +64,8 @@
     "name": "example-lem-usage",
     "allowedSubs": {},
     "premises": [
-      {
-        "condition": "( implies ( and phi psi ) chi )"
-      },
-      {
-        "condition": "( implies ( not ( and phi psi ) ) chi )"
-      }
+      { "condition": "( implies ( and phi psi ) chi )" },
+      { "condition": "( implies ( not ( and phi psi ) ) chi )" }
     ],
     "steps": [
       {
@@ -125,14 +83,8 @@
             "expression": "chi",
             "rule": "axm.implies-elim",
             "cites": [
-              {
-                "tag": "Line",
-                "contents": 1
-              },
-              {
-                "tag": "Line",
-                "contents": 4
-              }
+              { "tag": "Line", "contents": 1 },
+              { "tag": "Line", "contents": 4 }
             ]
           }
         ]
@@ -146,14 +98,8 @@
             "expression": "chi",
             "rule": "axm.implies-elim",
             "cites": [
-              {
-                "tag": "Line",
-                "contents": 2
-              },
-              {
-                "tag": "Line",
-                "contents": 6
-              }
+              { "tag": "Line", "contents": 2 },
+              { "tag": "Line", "contents": 6 }
             ]
           }
         ]
@@ -163,24 +109,9 @@
         "expression": "chi",
         "rule": "axm.or-elim",
         "cites": [
-          {
-            "tag": "Line",
-            "contents": 3
-          },
-          {
-            "tag": "Range",
-            "contents": [
-              4,
-              5
-            ]
-          },
-          {
-            "tag": "Range",
-            "contents": [
-              6,
-              7
-            ]
-          }
+          { "tag": "Line", "contents": 3 },
+          { "tag": "Range", "contents": [4, 5] },
+          { "tag": "Range", "contents": [6, 7] }
         ]
       }
     ]

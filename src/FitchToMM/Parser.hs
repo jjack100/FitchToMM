@@ -46,6 +46,7 @@ data Wff
   | WffQnt Quantifier T.Text Wff
   | WffAtom T.Text [Term]
   | WffMetavar T.Text
+  | WffSub Term T.Text Wff
   deriving (Show, Eq, Ord)
 
 data BinOp = OpAnd | OpOr | OpImplies | OpIff

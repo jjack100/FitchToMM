@@ -49,6 +49,13 @@ proveWff (WffAtom p args) = do
   return $ predPrf <> lstPrf <> wffPrf
 -- Handle metavariable representing an arbitrary WFF
 proveWff (WffMetavar var) = proveWffMetavar var
+-- Handle substitution
+proveWff (WffSub trm var phi) = do
+  phiPrf <- proveWff phi
+  varPrf <- proveVar var
+  trmPrf <- proveTrm trm
+  wffPrf <- proveStep wffSubStep
+  return $ phiPrf <> varPrf <> trmPrf <> wffPrf
 
 -- Metamath expects a list to be built by appending rather than prepending,
 -- so we must reverse the items first
@@ -140,3 +147,6 @@ prdStep prdName = RpnStep 0 $ "prd." <> prdName
 
 constStep :: T.Text -> RpnStep
 constStep constName = RpnStep 0 $ "trm." <> constName
+
+wffSubStep :: RpnStep
+wffSubStep = RpnStep 3 "wff.sub"

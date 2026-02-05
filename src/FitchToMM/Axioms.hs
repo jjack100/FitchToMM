@@ -148,7 +148,7 @@ axioms =
           (expr "( forall x psi )")
           [CtxHyp "...", WffHyp "phi", WffHyp "psi", VarHyp "a", VarHyp "x"]
           [Condition Nothing (expr "phi")]
-          [DVR (CtxHyp "...") (VarHyp "a")]
+          [mkDVR (CtxHyp "...") (VarHyp "a")]
       ),
       ( "axm.exists-intr",
         Fact
@@ -178,7 +178,7 @@ axioms =
           [ Condition Nothing (expr "( exists x phi )"),
             Condition (Just $ expr "psi") (expr "chi")
           ]
-          [DVR (CtxHyp "...") (VarHyp "a"), DVR (WffHyp "phi") (VarHyp "a"), DVR (WffHyp "chi") (VarHyp "a")]
+          [mkDVR (CtxHyp "...") (VarHyp "a"), mkDVR (WffHyp "phi") (VarHyp "a"), mkDVR (WffHyp "chi") (VarHyp "a")]
       ),
       ( "axm.eq-elim-1",
         Fact
@@ -187,7 +187,7 @@ axioms =
           [ Condition Nothing (expr "( eq trm_1 trm_2 )"),
             Condition Nothing (expr "phi")
           ]
-          [DVR (CtxHyp "x") (VarHyp "trm_1"), DVR (CtxHyp "x") (VarHyp "trm_2")]
+          [mkDVR (CtxHyp "x") (VarHyp "trm_1"), mkDVR (CtxHyp "x") (VarHyp "trm_2")]
       ),
       ( "thm.eq-elim-2",
         Fact
@@ -196,7 +196,7 @@ axioms =
           [ Condition Nothing (expr "( eq trm_1 trm_2 )"),
             Condition Nothing (expr "psi")
           ]
-          [DVR (CtxHyp "x") (VarHyp "trm_1"), DVR (CtxHyp "x") (VarHyp "trm_2")]
+          [mkDVR (CtxHyp "x") (VarHyp "trm_1"), mkDVR (CtxHyp "x") (VarHyp "trm_2")]
       )
     ]
 

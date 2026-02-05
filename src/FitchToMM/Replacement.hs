@@ -101,7 +101,7 @@ proveReplWff :: AllowedSubs -> Wff -> T.Text -> Wff -> Term -> ProofWriter
 proveReplWff freeIn w x w' withTrm
   | w == w',
     not $ occursInWff freeIn x w = do
-      reqDisjointFor x (varsInWff w)
+      reqDisjointFor (VarHyp x) (varsInWff w)
       wPrf <- proveWff w
       vPrf <- proveVar x
       tPrf <- proveTrm withTrm
@@ -137,8 +137,8 @@ proveReplWff freeIn (WffQnt q y w) x (WffQnt q' y' w') withTrm
     y == y',
     y /= x,
     not $ occursInTrm freeIn y withTrm = do
-      reqDisjoint $ DVR (VarHyp y) (VarHyp x)
-      reqDisjointFor y (varsInTrm withTrm)
+      reqDisjoint (VarHyp y) (VarHyp x)
+      reqDisjointFor (VarHyp y) (varsInTrm withTrm)
       phPrf <- proveWff w
       psPrf <- proveWff w'
       xPrf <- proveVar x
@@ -179,7 +179,7 @@ proveReplLst :: AllowedSubs -> [Term] -> T.Text -> [Term] -> Term -> ProofWriter
 proveReplLst freeIn l x l' withTrm
   | l == l',
     not $ any (occursInTrm freeIn x) l = do
-      reqDisjointFor x (varsInLst l)
+      reqDisjointFor (VarHyp x) (varsInLst l)
       vPrf <- proveVar x
       tPrf <- proveTrm withTrm
       lPrf <- proveLst l
@@ -208,7 +208,7 @@ proveReplTrm :: AllowedSubs -> Term -> T.Text -> Term -> Term -> ProofWriter
 proveReplTrm freeIn trm1 v trm2 withTrm
   | trm1 == trm2,
     not $ occursInTrm freeIn v trm1 = do
-      reqDisjointFor v (varsInTrm trm1)
+      reqDisjointFor (VarHyp v) (varsInTrm trm1)
       vPrf <- proveVar v
       tPrf <- proveTrm withTrm
       lPrf <- proveLst [trm1]
@@ -242,6 +242,7 @@ occursInWff f x (WffNot wff) = occursInWff f x wff
 occursInWff f x (WffQnt _ y wff) = x == y || occursInWff f x wff
 occursInWff f x (WffAtom _ args) = any (occursInTrm f x) args
 occursInWff f x (WffMetavar var) = x `elem` f var
+occursInWff f x (WffSub trm var wff) = x == var || occursInTrm f x trm || occursInWff f x wff
 occursInWff _ _ WffTrue = False
 occursInWff _ _ WffFalse = False
 

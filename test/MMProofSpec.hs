@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module MMProofSpec (spec) where
@@ -336,6 +337,28 @@ spec = describe "FitchProver" $ do
               ]
               [FitchStep (expr "( R C D E )") "axm.eq-elim" [Line 1, Line 2]]
       shouldVerifyProof folMM theorem2
+
+    it "can use universal quantification with implication" $ do
+      let theorem =
+            FitchProof
+              "forall-implies-example"
+              ( \case
+                  "chi" -> ["x"]
+                  _ -> []
+              )
+              [ Condition Nothing (expr "(forall x ( implies phi psi ))"),
+                Condition Nothing (expr "(implies psi chi)")
+              ]
+              [ FitchStep (expr "(implies phi psi)") "axm.forall-elim" [Line 1],
+                FitchSubproof
+                  (expr "phi")
+                  [ FitchStep (expr "psi") "axm.implies-elim" [Line 3, Line 4],
+                    FitchStep (expr "chi") "axm.implies-elim" [Line 2, Line 5]
+                  ],
+                FitchStep (expr "(implies phi chi)") "axm.implies-intr" [Range 4 6],
+                FitchStep (expr "(forall x (implies phi chi))") "axm.forall-intr" [Line 7]
+              ]
+      shouldVerifyProof folMM theorem
 
   describe "Validation of citations" $ do
     it "rejects citations of nonexistent lines" $ do

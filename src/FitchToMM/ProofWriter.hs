@@ -10,7 +10,7 @@ module FitchToMM.ProofWriter
     ProofProps (..),
     FHyp (..),
     Label,
-    DVR (..),
+    DVR(..),
     PropWriter,
     proveMetavar,
     proveVar,
@@ -29,6 +29,8 @@ module FitchToMM.ProofWriter
     listStack,
     reqDisjointFor,
     getSteps,
+    mkDVR,
+    applyDVR,
   )
 where
 
@@ -126,13 +128,17 @@ proveEllipsis = proveMetavar $ CtxHyp "..."
 proveStep :: RpnStep -> ProofWriter
 proveStep = pure . RpnStack . D.singleton . Just
 
-reqDisjoint :: DVR -> W.WriterT ProofProps (Either Mistake) ()
-reqDisjoint (DVR v1 v2) = do
-  let sorted = if v1 <= v2 then DVR v1 v2 else DVR v2 v1
-  W.tell $ ProofProps S.empty (S.singleton sorted)
+mkDVR :: FHyp -> FHyp -> DVR
+mkDVR v1 v2 = if v1 <= v2 then DVR v1 v2 else DVR v2 v1
 
-reqDisjointFor :: (Foldable t) => T.Text -> t FHyp -> PropWriter
-reqDisjointFor v = mapM_ (reqDisjoint . DVR (VarHyp v))
+applyDVR :: DVR -> W.WriterT ProofProps (Either Mistake) ()
+applyDVR dvr = W.tell $ ProofProps S.empty (S.singleton dvr)
+
+reqDisjoint :: FHyp -> FHyp -> W.WriterT ProofProps (Either Mistake) ()
+reqDisjoint v1 v2 = W.tell $ ProofProps S.empty (S.singleton $ mkDVR v1 v2)
+
+reqDisjointFor :: (Foldable t) => FHyp -> t FHyp -> PropWriter
+reqDisjointFor v = mapM_ (reqDisjoint v)
 
 runProofWriter :: ProofWriter -> (RpnStack, ProofProps)
 runProofWriter writer = case W.runWriterT writer of

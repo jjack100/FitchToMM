@@ -50,7 +50,7 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
           (S.toList mandDVRs)
       )
       (sortVars $ S.elems allFHyps)
-      (S.toList djVars)
+      (S.toList dvrs)
       finalRpnStack
       mistakesList
   where
@@ -73,13 +73,13 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
     mistakes = V.indexed $ fmap getMistake table
     mistakesList = mapMaybe sequence (V.toList mistakes)
     -- Get details from the proof itself
-    (finalRpnStack, ProofProps optFHyps djVars) = runProofWriter finalProof
+    (finalRpnStack, ProofProps optFHyps dvrs) = runProofWriter finalProof
     allFHyps = mandFHyps <> optFHyps
     -- Identify the mandatory disjoint variable restrictions (those that apply to mandatory vars)
     mandDVRs =
       S.filter
-        (\(DVR x y) -> (x `S.member` mandFHyps) && (y `S.member` mandFHyps))
-        djVars
+        (\(DVR v1 v2) -> (v1 `S.member` mandFHyps) && (v2 `S.member` mandFHyps))
+        dvrs
 
     -- Function for actually generating the proof at each step
     step :: Int -> FlatStep -> ProofWriter
@@ -175,19 +175,18 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
     lookupProof :: Int -> Context -> Citation -> ProofWriter
     lookupProof i ctx cite@(Line line)
       | Just err <- checkAccessibility flatProof i cite = lift $ Left err
-      | otherwise =
+      | otherwise = do
           -- Try to thin it into the given context if necessary
           let prf = table V.! line
               stp = flatProof V.! line
-              (basePrf, _) = runProofWriter prf
-           in proveThin ctx stp basePrf
+          -- On failure, run the proof writer to just emit a "?"
+          base <- if succeeded prf then prf else pure $ fst $ runProofWriter prf
+          proveThin ctx stp base
     lookupProof i _ cite@(Range _ to)
       | Just err <- checkAccessibility flatProof i cite = lift $ Left err
       | otherwise =
           let prf = table V.! to
-              -- If the proof has an error indicate step is unknown
-              (proofOrUnknown, _) = runProofWriter prf
-           in pure proofOrUnknown
+           in if succeeded prf then prf else pure $ fst $ runProofWriter prf
 
     lookupFact ref = (axioms M.!? ref) <|> (lookupThm ref)
 
@@ -195,7 +194,7 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
 applyDConds :: Substitution -> [DVR] -> PropWriter
 applyDConds sub dConds = do
   disjointVars <- try (checkDisjoints sub dConds) Inapplicable
-  mapM_ reqDisjoint disjointVars
+  mapM_ applyDVR disjointVars
 
 -- Check if a line or subproof is accessible to (able to be legitimately cited by) a given line
 checkAccessibility :: V.Vector FlatStep -> Int -> Citation -> Maybe Mistake
@@ -343,19 +342,24 @@ inferDVRs _ _ (WffTrue) = pure ()
 inferDVRs bound allowed (WffMetavar var) =
   let allowedSubs = S.fromList (VarHyp <$> allowed var)
       disjoint = S.difference bound allowedSubs
-   in reqDisjointFor var disjoint
+   in reqDisjointFor (WffHyp var) disjoint
 inferDVRs bound allowed (WffQnt _ var wff) =
   inferDVRs (S.insert (VarHyp var) bound) allowed wff
 inferDVRs bound allowed (WffAtom _ args) =
   mapM_ (inferDVRsTrm bound allowed) args
+inferDVRs bound allowed (WffSub trm var wff) = do
+  inferDVRsTrm bound allowed trm
+  -- Also treat variables subject to substitution as "bound" for our our
+  -- purposes here (within the scope of where the substitution occurs)
+  inferDVRs (S.insert (VarHyp var) bound) allowed wff
 
 inferDVRsTrm :: S.Set FHyp -> AllowedSubs -> Term -> PropWriter
 inferDVRsTrm bound allowed (TrmMetavar var) =
   let allowedSubs = S.fromList (VarHyp <$> allowed var)
       disjoint = S.difference bound allowedSubs
-   in reqDisjointFor var disjoint
+   in reqDisjointFor (TrmHyp var) disjoint
 inferDVRsTrm bound _ (TrmVar var) =
-  reqDisjointFor var (S.delete (VarHyp var) bound)
+  reqDisjointFor (VarHyp var) (S.delete (VarHyp var) bound)
 inferDVRsTrm bound allowed (TrmFunc _ args) =
   mapM_ (inferDVRsTrm bound allowed) args
 inferDVRsTrm _ _ (TrmConst _) = pure ()

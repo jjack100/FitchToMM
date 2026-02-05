@@ -7,7 +7,7 @@ module FitchToMM.Pretty
     prettyTrm,
     prettyPacked,
     prettyNormal,
-    prettyCompressed
+    prettyCompressed,
   )
 where
 
@@ -47,11 +47,11 @@ prettyCompressed (CompressedProof name fact fHyps djVars labels rpnStack _) =
    in prettyProof name fact fHyps djVars (prettyLabels <+> prettyStack)
 
 prettyProof :: Label -> Fact -> [FHyp] -> [DVR] -> Doc a -> Doc a
-prettyProof name fact fHyps djVars prettyStack =
+prettyProof name fact fHyps dvrs prettyStack =
   frame $
     vsep $
       prettyVars localVars
-        ++ [sep $ map prettyDVR djVars | not $ null djVars]
+        ++ [sep $ map prettyDVR dvrs | not $ null dvrs]
         ++ zipWith prettyEHyp (map pad eLabels) eHyps
         ++ [prettyPStmt (pad name) claim prettyStack]
   where
@@ -78,10 +78,10 @@ prettyFHyp (TrmHyp n) = "trm." <> pretty n <+> "$f trm" <+> pretty n <+> "$."
 prettyFHyp (CtxHyp n) = "ctx." <> pretty n <+> "$f ctx" <+> pretty n <+> "$."
 
 prettyDVR :: DVR -> Doc a
-prettyDVR (DVR var1 var2) =
+prettyDVR (DVR v1 v2) =
   "$d"
-    <+> pretty (fHypName var1)
-    <+> pretty (fHypName var2)
+    <+> pretty (fHypName $ v1)
+    <+> pretty (fHypName $ v2)
     <+> "$."
 
 prettyPStmt :: T.Text -> Wff -> Doc a -> Doc a
@@ -117,6 +117,7 @@ prettyWff (WffQnt q var wff) =
   prettySExpr [prettyQnt q, pretty var, prettyWff wff]
 prettyWff (WffAtom p args) = prettySExpr $ pretty p : map prettyTrm args
 prettyWff (WffMetavar v) = pretty v
+prettyWff (WffSub trm v wff) = prettySExpr ["sub", prettyTrm trm, pretty v, prettyWff wff]
 
 prettyTrm :: Term -> Doc a
 prettyTrm (TrmVar var) = pretty var
