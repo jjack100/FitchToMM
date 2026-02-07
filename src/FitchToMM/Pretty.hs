@@ -8,10 +8,14 @@ module FitchToMM.Pretty
     prettyPacked,
     prettyNormal,
     prettyCompressed,
+    prettyDVR,
   )
 where
 
-import Data.List ((\\))
+import Data.Algorithm.MaximalCliques (getMaximalCliques)
+import Data.List
+import Data.Ord
+import qualified Data.Set as S
 import qualified Data.Text as T
 import FitchToMM.Compressed
 import FitchToMM.FitchProof
@@ -50,7 +54,7 @@ prettyProof name fact fHyps dvrs prettyStack =
   frame $
     vsep $
       prettyVars name localVars
-        ++ [sep $ map prettyDVR dvrs | not $ null dvrs]
+        ++ [sep $ map prettyCompoundDVR compounds | not $ null dvrs]
         ++ zipWith prettyEHyp (map pad eLabels) eHyps
         ++ [prettyPStmt (pad name) claim prettyStack]
   where
@@ -59,6 +63,7 @@ prettyProof name fact fHyps dvrs prettyStack =
     labelLen = maximum $ map T.length (name : eLabels)
     pad = T.justifyLeft labelLen ' '
     localVars = fHyps \\ preDeclaredVars
+    compounds = compoundDVRs fHyps dvrs
     frame doc = nest 2 (vsep ["${", doc]) <> line <> "$}"
 
 number :: T.Text -> Int -> T.Text
@@ -82,6 +87,11 @@ prettyDVR (DVR v1 v2) =
     <+> pretty (fHypName $ v1)
     <+> pretty (fHypName $ v2)
     <+> "$."
+
+prettyCompoundDVR :: CompoundDVR -> Doc a
+prettyCompoundDVR dvr = "$d" <+> fillSep names <+> "$."
+  where
+    names = map (pretty . fHypName) $ S.toList dvr
 
 prettyPStmt :: T.Text -> Wff -> Doc a -> Doc a
 prettyPStmt label claim proof =
@@ -137,3 +147,29 @@ prettyQnt QntUnique = "unique"
 
 prettySExpr :: [Doc a] -> Doc a
 prettySExpr items = lparen <+> align (sep items) <+> rparen
+
+type CompoundDVR = S.Set FHyp
+
+compoundDVRs :: [FHyp] -> [DVR] -> [CompoundDVR]
+compoundDVRs fhyps dvrs = groups ++ S.toList ungrouped
+  where
+    groups = unfoldr go S.empty
+    coveredDVRs = S.unions $ map (cover . S.toList) groups
+    remaining = S.difference dvrSet coveredDVRs
+    ungrouped = S.map (\(DVR l r) -> S.fromList [l, r]) remaining
+
+    dvrSet = S.fromList dvrs
+
+    cliques =
+      sortOn (Down . length) $
+        filter (\x -> length x >= 3) $
+          getMaximalCliques (\l r -> (mkDVR l r) `S.member` dvrSet) fhyps
+
+    cover :: [FHyp] -> S.Set DVR
+    cover xs = S.fromList [mkDVR x y | x <- xs, y <- xs, x < y]
+
+    go :: S.Set DVR -> Maybe (CompoundDVR, S.Set DVR)
+    go covered = do
+      grouping <- find (\x -> covered `S.disjoint` cover x) cliques
+      let newCover = covered <> cover grouping
+      return (S.fromList grouping, newCover)

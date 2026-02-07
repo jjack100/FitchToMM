@@ -71,6 +71,7 @@ library
     base ^>=4.20.2.0,
     containers >=0.7 && <0.8,
     dlist >=1.0 && <1.1,
+    maximal-cliques,
     mtl >=2.3.1 && <2.4,
     openapi3 >=3.2.4 && <3.3,
     parsec >=3.1.18 && <3.2,
