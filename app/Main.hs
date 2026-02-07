@@ -41,7 +41,7 @@ data DisplayStyle = Fitch | Sequent
 
 data Options
   = OutputOptions FilePath ProofFormat
-  | DisplayOptions T.Text DisplayStyle
+  | DisplayOptions T.Text DisplayStyle Bool
 
 data Args = Args Options FilePath
 
@@ -76,6 +76,7 @@ displayOptionsParser =
             <> help "Display a specific proof instead of generating Metamath"
         )
       <*> styleParser
+      <*> switch (long "sexpr" <> help "Display formulae as raw S-Expressions (as they appear in the Metamath database)")
 
 styleParser :: Parser DisplayStyle
 styleParser =
@@ -101,8 +102,8 @@ main = do
         collection
         format
         outputFile
-    (DisplayOptions thmName dispStyle) ->
-      displayTheorem thmName collection dispStyle
+    (DisplayOptions thmName dispStyle asSExpr) ->
+      displayTheorem asSExpr thmName collection dispStyle
 
 generateDatabase :: T.Text -> Collection -> ProofFormat -> FilePath -> IO ()
 generateDatabase name (Collection theorems) format outputFile = do
@@ -117,16 +118,17 @@ generateDatabase name (Collection theorems) format outputFile = do
     TIO.putStr $ "Success! File generated at: "
     withBold stdout $ putStrLn outputFile
 
-displayTheorem :: T.Text -> Collection -> DisplayStyle -> IO ()
-displayTheorem thmName (Collection theorems) dispStyle = do
+displayTheorem :: Bool -> T.Text -> Collection -> DisplayStyle -> IO ()
+displayTheorem asSExpr thmName (Collection theorems) dispStyle = do
   theorem <-
     try
       (find (\thm -> Schema.getName thm == thmName) theorems)
       ("Theorem not found: " <> thmName)
   fitchProof <- either errorOut pure $ parseTheorem primitives theorem
+  let (FitchProof _ allowedSubs _ _) = fitchProof
   TIO.putStrLn $ case dispStyle of
-    Fitch -> prettyFitch $ fitchProof
-    Sequent -> prettyFlat thmName (flattenProof fitchProof)
+    Fitch -> prettyFitch asSExpr fitchProof
+    Sequent -> prettyFlat asSExpr thmName allowedSubs (flattenProof fitchProof)
 
 appendTheorem :: ProofFormat -> Database -> Schema.Theorem -> IO Database
 appendTheorem format (Database metamath facts lang) thm = do

@@ -106,6 +106,7 @@ executable fitch2mm
     fitch-to-mm,
     optparse-applicative,
     prettyprinter,
+    regex-tdfa,
     text,
 
   -- Directories containing source files.
