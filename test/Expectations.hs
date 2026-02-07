@@ -73,7 +73,7 @@ verifyWff base wff = do
           <> " $p wff "
           <> sexpr
           <> " $= "
-          <> (T.unwords $ listStack proof)
+          <> (T.unwords $ listStack label proof)
           <> " $. $} "
   (_, db) <- mmParseFromString $ T.unpack $ metamath
   mmVerifiesLabel db (T.unpack label)

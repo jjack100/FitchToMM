@@ -292,13 +292,20 @@ spec = describe "FitchProver" $ do
       shouldVerifyProof folMM theorem
 
     it "can use universal elimination" $ do
-      let theorem =
+      let theorem1 =
             FitchProof
-              "universal-elim-example"
+              "universal-elim-example-1"
               noneFree
               [Condition Nothing (expr "( forall x ( Q x x ) )")]
               [FitchStep (expr "( Q C C )") "axm.forall-elim" [Line 1]]
-      shouldVerifyProof folMM theorem
+      shouldVerifyProof folMM theorem1
+      let theorem2 =
+            FitchProof
+              "universal-elim-example-2"
+              noneFree
+              [Condition Nothing (expr "( forall x ( eq x trm_1 ) )")]
+              [FitchStep (expr "( eq trm_1 trm_1 )") "axm.forall-elim" [Line 1]]
+      shouldVerifyProof folMM theorem2
 
     it "can use existential elimination" $ do
       let theorem =
@@ -358,6 +365,24 @@ spec = describe "FitchProver" $ do
                 FitchStep (expr "(implies phi chi)") "axm.implies-intr" [Range 4 6],
                 FitchStep (expr "(forall x (implies phi chi))") "axm.forall-intr" [Line 7]
               ]
+      shouldVerifyProof folMM theorem
+
+    it "can introduce substitution by definition" $ do
+      let theorem =
+            FitchProof
+              "sub-intr-example"
+              noneFree
+              [Condition Nothing (expr "( eq a a )")]
+              [FitchStep (expr "( sub a b ( eq b b ) )") "def.sub" [Line 1]]
+      shouldVerifyProof folMM theorem
+
+    it "can eliminate substitution by definition" $ do
+      let theorem =
+            FitchProof
+              "sub-elim-example"
+              noneFree
+              [Condition Nothing (expr "( sub a b ( eq b b ) )")]
+              [FitchStep (expr "( eq a a )") "def.sub" [Line 1]]
       shouldVerifyProof folMM theorem
 
   describe "Validation of citations" $ do

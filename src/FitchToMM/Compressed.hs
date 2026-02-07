@@ -96,7 +96,7 @@ packProof (MMProof label fact fhyps dvrs stack mistakes) =
   PackedProof label fact fhyps dvrs packedSteps mistakes
   where
     packedSteps = packTree (`S.member` toPack) tree
-    tree = parseRPN $ getSteps stack
+    tree = parseRPN $ getSteps label stack
     toPack = findPackable tree
 
 packTree :: (ProofTree -> Bool) -> ProofTree -> [PackedStep]

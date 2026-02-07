@@ -13,7 +13,6 @@ where
 
 import Data.List ((\\))
 import qualified Data.Text as T
-import FitchToMM.Axioms
 import FitchToMM.Compressed
 import FitchToMM.FitchProof
 import FitchToMM.MMProof
@@ -26,7 +25,7 @@ printProof proof = print $ prettyNormal proof
 
 prettyNormal :: MMProof -> Doc a
 prettyNormal (MMProof name fact fHyps djVars rpnStack _) =
-  let proof = fillSep $ map pretty $ listStack rpnStack
+  let proof = fillSep $ map pretty $ listStack name rpnStack
    in prettyProof name fact fHyps djVars proof
 
 prettyPacked :: PackedProof -> Doc a
@@ -50,7 +49,7 @@ prettyProof :: Label -> Fact -> [FHyp] -> [DVR] -> Doc a -> Doc a
 prettyProof name fact fHyps dvrs prettyStack =
   frame $
     vsep $
-      prettyVars localVars
+      prettyVars name localVars
         ++ [sep $ map prettyDVR dvrs | not $ null dvrs]
         ++ zipWith prettyEHyp (map pad eLabels) eHyps
         ++ [prettyPStmt (pad name) claim prettyStack]
@@ -65,17 +64,17 @@ prettyProof name fact fHyps dvrs prettyStack =
 number :: T.Text -> Int -> T.Text
 number text n = text <> "." <> T.pack (show n)
 
-prettyVars :: [FHyp] -> [Doc a]
-prettyVars [] = []
-prettyVars vars =
+prettyVars :: T.Text -> [FHyp] -> [Doc a]
+prettyVars _ [] = []
+prettyVars thmLabel vars =
   ("$v" <+> align (fillSep $ map (pretty . fHypName) vars) <+> "$.")
-    : map prettyFHyp vars
+    : map (prettyFHyp (thmLabel <> ".")) vars
 
-prettyFHyp :: FHyp -> Doc a
-prettyFHyp (WffHyp n) = "wff." <> pretty n <+> "$f wff" <+> pretty n <+> "$."
-prettyFHyp (VarHyp n) = "var." <> pretty n <+> "$f var" <+> pretty n <+> "$."
-prettyFHyp (TrmHyp n) = "trm." <> pretty n <+> "$f trm" <+> pretty n <+> "$."
-prettyFHyp (CtxHyp n) = "ctx." <> pretty n <+> "$f ctx" <+> pretty n <+> "$."
+prettyFHyp :: T.Text -> FHyp -> Doc a
+prettyFHyp prefix (WffHyp n) = pretty prefix <> "wff." <> pretty n <+> "$f wff" <+> pretty n <+> "$."
+prettyFHyp prefix (VarHyp n) = pretty prefix <> "var." <> pretty n <+> "$f var" <+> pretty n <+> "$."
+prettyFHyp prefix (TrmHyp n) = pretty prefix <> "trm." <> pretty n <+> "$f trm" <+> pretty n <+> "$."
+prettyFHyp prefix (CtxHyp n) = pretty prefix <> "ctx." <> pretty n <+> "$f ctx" <+> pretty n <+> "$."
 
 prettyDVR :: DVR -> Doc a
 prettyDVR (DVR v1 v2) =

@@ -55,7 +55,7 @@ matchTo (WffAtom p args) (WffAtom p' args') | p == p' = do
   mergeFold argSubs
 matchTo (WffSub t v w) (WffSub t' v' w') = do
   trmSub <- matchToTrm t t'
-  let varSub = singletonVar v v'
+  let varSub = singletonVar v' v
   wffSub <- matchTo w w'
   mergeFold [trmSub, varSub, wffSub]
 -- Otherwise the match fails

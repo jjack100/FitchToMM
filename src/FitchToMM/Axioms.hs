@@ -1,10 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module FitchToMM.Axioms (axioms, preDeclaredVars, sortVars) where
+module FitchToMM.Axioms (axioms) where
 
-import Data.List
 import qualified Data.Map.Strict as M
-import Data.Maybe
 import qualified Data.Text as T
 import FitchToMM.Fact
 import FitchToMM.FitchProof (Condition (..))
@@ -202,16 +200,3 @@ axioms =
 
 expr :: T.Text -> Wff
 expr = unsafeParseFormula $ primitives
-
-preDeclaredVars :: [FHyp]
-preDeclaredVars =
-  [CtxHyp "..."]
-    ++ map WffHyp ["phi", "psi", "chi", "phi_1", "psi_1", "chi_1", "phi_2", "psi_2", "chi_2"]
-    ++ map (VarHyp . T.singleton) ['a' .. 'z']
-    ++ map TrmHyp ["trm_1", "trm_2", "trm_3"]
-
-sortVars :: [FHyp] -> [FHyp]
-sortVars = sortOn $ \x -> (pos x, x)
-  where
-    pos x = fromMaybe end (elemIndex x preDeclaredVars)
-    end = length preDeclaredVars

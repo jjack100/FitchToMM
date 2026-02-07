@@ -10,11 +10,12 @@ module FitchToMM.ProofWriter
     ProofProps (..),
     FHyp (..),
     Label,
-    DVR(..),
+    DVR (..),
     PropWriter,
     proveMetavar,
     proveVar,
     proveStep,
+    proveLocalStep,
     runProofWriter,
     reqDisjoint,
     execProofWriter,
@@ -31,12 +32,16 @@ module FitchToMM.ProofWriter
     getSteps,
     mkDVR,
     applyDVR,
+    preDeclaredVars,
+    sortVars,
   )
 where
 
 import qualified Control.Monad.Writer.Strict as W
 import qualified Data.DList as D
 import Data.Either
+import Data.List
+import Data.Maybe
 import Data.Semigroup.Generic
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -53,7 +58,12 @@ data ProofProps = ProofProps (S.Set FHyp) (S.Set DVR)
     (Semigroup, Monoid)
     via (GenericSemigroupMonoid ProofProps)
 
-newtype RpnStack = RpnStack (D.DList (Maybe RpnStep))
+newtype RpnStack = RpnStack (D.DList StackEntry)
+  deriving (Show)
+
+-- Store a boolean flag indicating if the step is "local" and should be prefixed
+-- with the label of the theorem
+data StackEntry = StackEntry Bool RpnStep | Unknown
   deriving (Show)
 
 data RpnStep = RpnStep Int Label
@@ -96,7 +106,8 @@ data Mistake
 proveMetavar :: FHyp -> ProofWriter
 proveMetavar fhyp = do
   W.tell $ ProofProps (S.singleton fhyp) S.empty
-  proveStep $ RpnStep 0 $ fHypLabel fhyp
+  let prove = if fhyp `elem` preDeclaredVars then proveStep else proveLocalStep
+  prove $ RpnStep 0 $ fHypLabel fhyp
 
 fHypLabel :: FHyp -> Label
 fHypLabel (VarHyp l) = "var." <> l
@@ -126,7 +137,10 @@ proveEllipsis :: ProofWriter
 proveEllipsis = proveMetavar $ CtxHyp "..."
 
 proveStep :: RpnStep -> ProofWriter
-proveStep = pure . RpnStack . D.singleton . Just
+proveStep = pure . RpnStack . D.singleton . (StackEntry False)
+
+proveLocalStep :: RpnStep -> ProofWriter
+proveLocalStep = pure . RpnStack . D.singleton . (StackEntry True)
 
 mkDVR :: FHyp -> FHyp -> DVR
 mkDVR v1 v2 = if v1 <= v2 then DVR v1 v2 else DVR v2 v1
@@ -142,7 +156,7 @@ reqDisjointFor v = mapM_ (reqDisjoint v)
 
 runProofWriter :: ProofWriter -> (RpnStack, ProofProps)
 runProofWriter writer = case W.runWriterT writer of
-  Left _ -> (RpnStack (D.singleton Nothing), ProofProps S.empty S.empty)
+  Left _ -> (RpnStack (D.singleton Unknown), ProofProps S.empty S.empty)
   Right res -> res
 
 execProofWriter :: ProofWriter -> ProofProps
@@ -159,10 +173,30 @@ failed = isLeft . W.runWriterT
 succeeded :: ProofWriter -> Bool
 succeeded = isRight . W.runWriterT
 
-listStack :: RpnStack -> [T.Text]
-listStack (RpnStack stack) =
-  let getLabel (RpnStep _ label) = label
-   in map (maybe "?" getLabel) $ D.toList stack
+listStack :: T.Text -> RpnStack -> [T.Text]
+listStack thmLabel stack =
+  map
+    (maybe "?" $ \(RpnStep _ label) -> label)
+    $ getSteps thmLabel stack
 
-getSteps :: RpnStack -> [Maybe RpnStep]
-getSteps (RpnStack dlist) = D.toList dlist
+getSteps :: T.Text -> RpnStack -> [Maybe RpnStep]
+getSteps thmLabel (RpnStack dlist) =
+  let getStep (StackEntry True (RpnStep arity label)) =
+        Just $ RpnStep arity (thmLabel <> "." <> label)
+      getStep (StackEntry False step) = Just step
+      getStep (Unknown) = Nothing
+   in map getStep (D.toList dlist)
+
+preDeclaredVars :: [FHyp]
+preDeclaredVars =
+  [CtxHyp "..."]
+    ++ map WffHyp ["phi", "psi", "chi", "phi_1", "psi_1", "chi_1", "phi_2", "psi_2", "chi_2"]
+    ++ map (VarHyp . T.singleton) ['a' .. 'z']
+    ++ map TrmHyp ["trm_1", "trm_2", "trm_3"]
+    ++ [VarHyp "_a", VarHyp "_x", VarHyp "_trm_1"]
+
+sortVars :: [FHyp] -> [FHyp]
+sortVars = sortOn $ \x -> (pos x, x)
+  where
+    pos x = fromMaybe end (elemIndex x preDeclaredVars)
+    end = length preDeclaredVars

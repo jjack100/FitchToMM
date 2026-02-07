@@ -53,14 +53,16 @@ solveForTrm freeIn wff1 wff2 x = do
       | q == q', y == y', y /= x = findSub w w'
       | q == q', y == y', y == x, w == w' = Just mempty
     findSub (WffMetavar m) (WffMetavar m') | m == m' = Just mempty
+    findSub (WffSub t _ w) w' | w == w' = Just $ First $ Just t
     findSub _ _ = Nothing
 
     findSubTrm :: Term -> Term -> Maybe (First Term)
-    findSubTrm t (TrmVar y) | x == y = Just $ First (Just t)
+    findSubTrm t (TrmVar y) | x == y = Just $ First $ Just t
     findSubTrm (TrmVar y) (TrmVar y') | y == y' = Just mempty
     findSubTrm (TrmFunc f args) (TrmFunc f' args')
       | f == f' = mconcat <$> zipWithM findSubTrm args args'
     findSubTrm (TrmConst c) (TrmConst c') | c == c' = Just mempty
+    findSubTrm (TrmMetavar t) (TrmMetavar t') | t == t' = Just mempty
     findSubTrm _ _ = Nothing
 
 -- Given two formulae P and Q, two terms t1 and t2, and a variable x, determine
@@ -84,7 +86,12 @@ solveForWff freeIn wff1 wff2 t1 t2 x = do
     findSub (WffAtom p args) (WffAtom p' args')
       | p == p' = WffAtom p <$> zipWithM findSubTrm args args'
     findSub (WffQnt q y w) (WffQnt q' y' w')
-      | q == q', y == y' = findSub w w'
+      | q == q', y == y' = WffQnt q y <$> findSub w w'
+    findSub (WffSub t y w) (WffSub t' y' w')
+      | y == y' = do
+          trmSub <- findSubTrm t t'
+          wffSub <- findSub w w'
+          return $ (WffSub trmSub y wffSub)
     findSub _ _ = Nothing
 
     findSubTrm :: Term -> Term -> Maybe Term
@@ -97,6 +104,14 @@ solveForWff freeIn wff1 wff2 t1 t2 x = do
 -- Functions to prove a replacement statement once the substitution is known
 
 proveReplWff :: AllowedSubs -> Wff -> T.Text -> Wff -> Term -> ProofWriter
+-- Handle trivial case where a variable is replaced with itself
+proveReplWff _ w x w' (TrmVar y)
+  | x == y,
+    w == w' = do
+      wPrf <- proveWff w
+      xPrf <- proveVar x
+      sPrf <- proveStep subIdStep
+      return $ wPrf <> xPrf <> sPrf
 -- Handle case for where the variable to be replaced does not occur
 proveReplWff freeIn w x w' withTrm
   | w == w',
@@ -172,6 +187,47 @@ proveReplWff freeIn (WffAtom p args) v (WffAtom p' args') t
       rPrf <- proveReplLst freeIn args v args' t
       subPrf <- proveStep subPrdStep
       return $ vPrf <> pPrf <> tPrf <> args1Prf <> args2Prf <> rPrf <> subPrf
+-- Handle substitution
+proveReplWff _ (WffSub t x w) x' w' t'
+  | t == t',
+    x == x',
+    w == w' = do
+      wPrf <- proveWff w
+      xPrf <- proveVar x
+      tPrf <- proveTrm t
+      sPrf <- proveStep subSub1Step
+      return $ wPrf <> xPrf <> tPrf <> sPrf
+proveReplWff freeIn (WffSub t1 y ph) x (WffSub t2 y' ps) t3
+  | y == y',
+    y /= x,
+    not $ occursInTrm freeIn y t3 =
+      do
+        reqDisjoint (VarHyp x) (VarHyp y)
+        reqDisjointFor (VarHyp y) (varsInTrm t3)
+        phPrf <- proveWff ph
+        psPrf <- proveWff ps
+        xPrf <- proveVar x
+        yPrf <- proveVar y
+        t1Prf <- proveTrm t1
+        t2Prf <- proveTrm t2
+        t3Prf <- proveTrm t3
+        let fHyps = phPrf <> psPrf <> xPrf <> yPrf <> t1Prf <> t2Prf <> t3Prf
+        r1Prf <- proveReplTrm freeIn t1 x t2 t3
+        r2Prf <- proveReplWff freeIn ph x ps t3
+        sPrf <- proveStep subSub2Step
+        return $ fHyps <> r1Prf <> r2Prf <> sPrf
+proveReplWff freeIn ph y (WffSub (TrmVar y') x ph') (TrmVar x')
+  | ph == ph',
+    x == x',
+    y == y',
+    not $ occursInWff freeIn y ph =
+      do
+        reqDisjointFor (VarHyp y) (varsInWff ph)
+        phPrf <- proveWff ph
+        xPrf <- proveVar x
+        yPrf <- proveVar y
+        sPrf <- proveStep subSub3Step
+        return $ phPrf <> xPrf <> yPrf <> sPrf
 proveReplWff _ _ _ _ _ = W.lift $ Left Inapplicable
 
 proveReplLst :: AllowedSubs -> [Term] -> T.Text -> [Term] -> Term -> ProofWriter
@@ -264,6 +320,9 @@ subNoneWffStep = RpnStep 3 "sub.none-wff"
 subNoneTrmStep :: RpnStep
 subNoneTrmStep = RpnStep 3 "sub.none-trm"
 
+subIdStep :: RpnStep
+subIdStep = RpnStep 2 "sub.id"
+
 subBinOpStep :: BinOp -> RpnStep
 subBinOpStep OpAnd = RpnStep 8 "sub.and"
 subBinOpStep OpOr = RpnStep 8 "sub.or"
@@ -287,3 +346,12 @@ subFuncStep = RpnStep 6 "sub.func"
 
 subTrmStep :: RpnStep
 subTrmStep = RpnStep 8 "sub.trm"
+
+subSub1Step :: RpnStep
+subSub1Step = RpnStep 3 "sub.sub-1"
+
+subSub2Step :: RpnStep
+subSub2Step = RpnStep 9 "sub.sub-2"
+
+subSub3Step :: RpnStep
+subSub3Step = RpnStep 3 "sub.sub-3"

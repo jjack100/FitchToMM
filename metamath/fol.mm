@@ -257,6 +257,14 @@ $( Introduce the equality predicate $)
 $c eq $.
 prd.eq $a prd eq $.
 
+$( We will use variables prefixed with an underscore to indicate they are
+   "internal", i.e., not occuring in the original Fitch proof but needed to
+   complete the generated proof. $)
+$v _a _x _trm_1 $.
+var._a     $f var _a $.
+var._x     $f var _x $.
+var._trm_1 $f var _trm_1 $.
+
 $( -------- Substitution --------
 
   Here we define a notion of proper substitution.
@@ -285,6 +293,9 @@ $} ${
   $d x ..t $.
   sub.none-trm $a ; ..t REPLACES x IN ..t WITH trm_1 $.
 $}
+
+$( Replacing a variable with itself changes nothing $)
+sub.id $a ; phi REPLACES x IN phi WITH x $.
 
 $( Recursive cases: $)
 
@@ -430,3 +441,7 @@ ${
   sub.sub-2.2 $e ; phi REPLACES x IN psi WITH trm_3 $.
   sub.sub-2   $a ; ( sub trm_1 y phi ) REPLACES x IN ( sub trm_2 y psi ) WITH trm_3 $.
 $} 
+${
+  $d y phi $.
+  sub.sub-3 $a ; phi REPLACES y IN ( sub y x phi ) WITH x $.
+$}

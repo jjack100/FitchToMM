@@ -85,6 +85,7 @@ parseWff l = strip $ do
     <|> try (parseBinaryOp l)
     <|> try (parseUnaryOp l)
     <|> try (parseQuantifier l)
+    <|> try (parseSub l)
     <|> parsePredicate l
 
 parseBinaryOp :: Language -> Parser Wff
@@ -125,6 +126,14 @@ parseMetavariable = do
   var <- word "phi" <|> word "psi" <|> word "chi"
   subscript <- option "" parseSubscript
   return $ WffMetavar $ var <> subscript
+
+parseSub :: Language -> Parser Wff
+parseSub l = parens $ do
+  _ <- word "sub"
+  trm <- parseTerm l
+  TrmVar var <- parseVariable
+  wff <- parseWff l
+  return $ WffSub trm var wff
 
 parseTerm :: Language -> Parser Term
 parseTerm l = strip $ do

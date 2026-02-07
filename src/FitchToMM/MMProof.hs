@@ -90,10 +90,7 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
           lift $ Left LeftUndischarged
     -- Handle premises
     step _ (FlatStep _ _ (Premise num) _ _) =
-      proveStep $
-        RpnStep
-          0
-          ("thm." <> prfName <> "." <> T.pack (show $ num + 1))
+      proveLocalStep $ RpnStep 0 (T.show $ num + 1)
     -- Handle assumptions
     step _ (FlatStep (assump : ctx) wff Assumption _ _) | assump == wff = do
       ctxPrf <- proveCtx ctx
@@ -109,23 +106,16 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
           lookupProof i ctx citation
       | otherwise = lift $ Left Inapplicable
     step _ (FlatStep _ _ Reiteration _ _) = lift $ Left BadCiteCount
-    -- For rules that have two versions, provide an alias that tries both alternatives
-    step i (FlatStep ctx expr (Reference "axm.or-intr") cites pos) =
-      let res1 = step i (FlatStep ctx expr (Reference "axm.or-intr-1") cites pos)
-          res2 = step i (FlatStep ctx expr (Reference "axm.or-intr-2") cites pos)
-       in if succeeded res1 then res1 else res2
-    step i (FlatStep ctx expr (Reference "axm.and-elim") cites pos) =
-      let res1 = step i (FlatStep ctx expr (Reference "axm.and-elim-1") cites pos)
-          res2 = step i (FlatStep ctx expr (Reference "axm.and-elim-2") cites pos)
-       in if succeeded res1 then res1 else res2
-    step i (FlatStep ctx expr (Reference "axm.iff-elim") cites pos) =
-      let res1 = step i (FlatStep ctx expr (Reference "axm.iff-elim-1") cites pos)
-          res2 = step i (FlatStep ctx expr (Reference "axm.iff-elim-2") cites pos)
-       in if succeeded res1 then res1 else res2
-    step i (FlatStep ctx expr (Reference "axm.eq-elim") cites pos) =
-      let res1 = step i (FlatStep ctx expr (Reference "axm.eq-elim-1") cites pos)
-          res2 = step i (FlatStep ctx expr (Reference "thm.eq-elim-2") cites pos)
-       in if succeeded res1 then res1 else res2
+    -- For rules that have multiple versions, provide an alias that tries alternatives
+    step i fs@(FlatStep _ _ (Reference "axm.or-intr") _ _) = choice i fs ["axm.or-intr-1", "axm.or-intr-2"]
+    step i fs@(FlatStep _ _ (Reference "axm.and-elim") _ _) = choice i fs ["axm.and-elim-1", "axm.and-elim-2"]
+    step i fs@(FlatStep _ _ (Reference "axm.iff-elim") _ _) = choice i fs ["axm.iff-elim-1", "axm.iff-elim-2"]
+    step i fs@(FlatStep _ _ (Reference "axm.eq-elim") _ _) = choice i fs ["axm.eq-elim-1", "thm.eq-elim-2"]
+    -- Handle references to the definition of substitution
+    step i fs@(FlatStep _ _ (Reference "def.sub") _ _) =
+      let intrPrf = proveSubI i fs
+          elimPrf = proveSubE i fs
+       in if succeeded intrPrf then intrPrf else elimPrf
     -- Handle application of a referenced rule
     step i (FlatStep ctx wff (Reference ref) citations _) = do
       Fact claim fHyps eHyps dConds <- try (lookupFact ref) UnrecognizedFact
@@ -158,6 +148,41 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
           <> mconcat replPrfs
           <> mconcat eHypPrfs
           <> labelProof
+
+    -- Prove the introduction of a substitution
+    proveSubI :: Int -> FlatStep -> ProofWriter
+    proveSubI i (FlatStep ctx wff _ [citation] _) = do
+      (FlatStep _ cited _ _ _) <- lift $ lookupStep i ctx citation
+      sub <- try (mergeFold [singletonCtx ctx, singletonWff "phi" wff, singletonWff "psi" cited]) Inapplicable
+      let fHyps = [CtxHyp "...", WffHyp "phi", WffHyp "psi"]
+      fHypPrfs <- mapM (proveFHyp sub) fHyps
+      defSubPrf <- proveDefSub allowedSubs wff cited
+      citedPrf <- lookupProof i ctx citation
+      labelProof <- proveStep $ RpnStep 5 "axm.def-intr"
+      return $ mconcat fHypPrfs <> defSubPrf <> citedPrf <> labelProof
+    proveSubI _ _ = lift $ Left BadCiteCount
+
+    -- Prove the elimination of a substitution
+    proveSubE :: Int -> FlatStep -> ProofWriter
+    proveSubE i (FlatStep ctx wff _ [citation] _) = do
+      (FlatStep _ cited _ _ _) <- lift $ lookupStep i ctx citation
+      sub <- try (mergeFold [singletonCtx ctx, singletonWff "phi" cited, singletonWff "psi" wff]) Inapplicable
+      let fHyps = [CtxHyp "...", WffHyp "phi", WffHyp "psi"]
+      fHypPrfs <- mapM (proveFHyp sub) fHyps
+      defSubPrf <- proveDefSub allowedSubs cited wff
+      citedPrf <- lookupProof i ctx citation
+      labelProof <- proveStep $ RpnStep 5 "axm.def-elim"
+      return $ mconcat fHypPrfs <> defSubPrf <> citedPrf <> labelProof
+    proveSubE _ _ = lift $ Left BadCiteCount
+
+    -- Try several possible references, and take the first that succeeds
+    choice :: Int -> FlatStep -> [T.Text] -> ProofWriter
+    choice i (FlatStep ctx expr original cites pos) choices =
+      let apply jus = step i (FlatStep ctx expr jus cites pos)
+          results = map (apply . Reference) choices
+          -- Apply the original justification if the choices list was empty
+          defaultRes = fromMaybe (apply original) $ listToMaybe results
+       in fromMaybe defaultRes $ find succeeded results
 
     -- Lookup a past step given a citation
     lookupStep :: Int -> Context -> Citation -> Either Mistake FlatStep
@@ -295,6 +320,23 @@ proveEqE allowed sub = do
   let replPrf1 = proveReplWff allowed phi "_x" chi trm_1
   let replPrf2 = proveReplWff allowed psi "_x" chi trm_2
   return (fullSub, [replPrf1, replPrf2])
+
+proveDefSub :: AllowedSubs -> Wff -> Wff -> ProofWriter
+proveDefSub allowedSubs definiendum definiens = do
+  sub1 <- try (definiendum `matchTo` WffSub (TrmMetavar "trm_1") "x" (WffMetavar "phi")) Inapplicable
+  sub2 <- try (merge sub1 (singletonWff "psi" definiens)) Inapplicable
+  -- Get the proofs for the floating hypotheses
+  let fHyps = [WffHyp "phi", WffHyp "psi", VarHyp "x", TrmHyp "trm_1"]
+  fHypPrfs <- mapM (proveFHyp sub2) fHyps
+  -- Get the proof for the replacement statement
+  phi <- try (lookupWff "phi" sub2) Inapplicable
+  psi <- try (lookupWff "psi" sub2) Inapplicable
+  x <- try (lookupVar "x" sub2) Inapplicable
+  trm_1 <- try (lookupTrm "trm_1" sub2) Inapplicable
+  replPrf <- proveReplWff allowedSubs psi x phi trm_1
+  -- Prove the definition statement
+  labelProof <- proveStep $ RpnStep 5 "def.sub"
+  return $ mconcat fHypPrfs <> replPrf <> labelProof
 
 proveFHyp :: Substitution -> FHyp -> ProofWriter
 proveFHyp sub (WffHyp hyp) | Just wff <- lookupWff hyp sub = proveWff wff
