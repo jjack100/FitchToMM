@@ -226,6 +226,111 @@
     ]
   },
   {
+    "name": "ax-5",
+    "allowedSubs": {},
+    "premises": [],
+    "steps": [
+      {
+        "tag": "Subproof",
+        "assumption": "phi",
+        "substeps": [
+          {
+            "tag": "ProofStep",
+            "expression": "( forall x phi )",
+            "rule": "axm.forall-intr",
+            "cites": [{ "tag": "Line", "contents": 1 }]
+          }
+        ]
+      },
+      {
+        "tag": "ProofStep",
+        "expression": "( implies phi ( forall x phi ) )",
+        "rule": "axm.implies-intr",
+        "cites": [{ "tag": "Range", "contents": [1, 2] }]
+      }
+    ]
+  },
+  {
+    "name": "ax6v",
+    "allowedSubs": {},
+    "premises": [],
+    "steps": [
+      {
+        "tag": "Subproof",
+        "assumption": "( forall x ( not ( eq x trm_1 ) ) )",
+        "substeps": [
+          {
+            "tag": "ProofStep",
+            "expression": "( not ( eq trm_1 trm_1 ) )",
+            "rule": "axm.forall-elim",
+            "cites": [{ "tag": "Line", "contents": 1 }]
+          },
+          {
+            "tag": "ProofStep",
+            "expression": "( eq trm_1 trm_1 )",
+            "rule": "axm.eq-intr",
+            "cites": []
+          },
+          {
+            "tag": "ProofStep",
+            "expression": "false",
+            "rule": "axm.not-elim",
+            "cites": [
+              { "tag": "Line", "contents": 3 },
+              { "tag": "Line", "contents": 2 }
+            ]
+          }
+        ]
+      },
+      {
+        "tag": "ProofStep",
+        "expression": "( not ( forall x ( not ( eq x trm_1 ) ) ) )",
+        "rule": "axm.not-intr",
+        "cites": [{ "tag": "Range", "contents": [1, 4] }]
+      }
+    ]
+  },
+  {
+    "name": "ax-7",
+    "allowedSubs": {},
+    "premises": [],
+    "steps": [
+      {
+        "tag": "Subproof",
+        "assumption": "( eq trm_1 trm_2 )",
+        "substeps": [
+          {
+            "tag": "Subproof",
+            "assumption": "( eq trm_1 trm_3 )",
+            "substeps": [
+              {
+                "tag": "ProofStep",
+                "expression": "( eq trm_2 trm_3 )",
+                "rule": "axm.eq-elim",
+                "cites": [
+                  { "tag": "Line", "contents": 1 },
+                  { "tag": "Line", "contents": 2 }
+                ]
+              }
+            ]
+          },
+          {
+            "tag": "ProofStep",
+            "expression": "( implies ( eq trm_1 trm_3 ) ( eq trm_2 trm_3 ) )",
+            "rule": "axm.implies-intr",
+            "cites": [{ "tag": "Range", "contents": [2, 3] }]
+          }
+        ]
+      },
+      {
+        "tag": "ProofStep",
+        "expression": "( implies ( eq trm_1 trm_2 ) ( implies ( eq trm_1 trm_3 ) ( eq trm_2 trm_3 ) ) )",
+        "rule": "axm.implies-intr",
+        "cites": [{ "tag": "Range", "contents": [1, 4] }]
+      }
+    ]
+  },
+  {
     "name": "sbid",
     "allowedSubs": { "phi": ["x"] },
     "premises": [],
