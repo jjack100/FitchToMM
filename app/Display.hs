@@ -81,7 +81,7 @@ prettyFitch asSExpr (FitchProof name allowedSubs prems steps) =
       let premTxt = render prem
           supTxt = render sup
        in [ (True, "│ │ " <> supTxt, "Assumption"),
-            (False, "│ ├─" <> premTxt, ""),
+            (False, "│ ├─" <> T.replicate (T.length supTxt) "─", ""),
             (True, "│ │ " <> premTxt, "Premise #" <> T.show num),
             (False, "│", "")
           ]
