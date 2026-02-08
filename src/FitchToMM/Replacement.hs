@@ -54,6 +54,10 @@ solveForTrm freeIn wff1 wff2 x = do
       | q == q', y == y', y == x, w == w' = Just mempty
     findSub (WffMetavar m) (WffMetavar m') | m == m' = Just mempty
     findSub (WffSub t _ w) w' | w == w' = Just $ First $ Just t
+    findSub (WffSub t y w) (WffSub t' y' w') | y == y' = do
+      trmSub <- findSubTrm t t'
+      wffSub <- findSub w w'
+      return $ trmSub <> wffSub
     findSub _ _ = Nothing
 
     findSubTrm :: Term -> Term -> Maybe (First Term)

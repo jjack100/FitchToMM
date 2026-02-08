@@ -331,6 +331,49 @@
     ]
   },
   {
+    "name": "ax-11",
+    "allowedSubs": { "phi": ["x", "y"] },
+    "premises": [],
+    "steps": [
+      {
+        "tag": "Subproof",
+        "assumption": "( forall x ( forall y phi ) )",
+        "substeps": [
+          {
+            "tag": "ProofStep",
+            "expression": "( forall y ( sub a x phi ) )",
+            "rule": "axm.forall-elim",
+            "cites": [{ "tag": "Line", "contents": 1 }]
+          },
+          {
+            "tag": "ProofStep",
+            "expression": "( sub a x ( sub b y phi ) )",
+            "rule": "axm.forall-elim",
+            "cites": [{ "tag": "Line", "contents": 2 }]
+          },
+          {
+            "tag": "ProofStep",
+            "expression": "( forall x ( sub b y phi ) )",
+            "rule": "axm.forall-intr",
+            "cites": [{ "tag": "Line", "contents": 3 }]
+          },
+          {
+            "tag": "ProofStep",
+            "expression": "( forall y ( forall x phi ) )",
+            "rule": "axm.forall-intr",
+            "cites": [{ "tag": "Line", "contents": 4 }]
+          }
+        ]
+      },
+      {
+        "tag": "ProofStep",
+        "expression": "( implies ( forall x ( forall y phi ) ) ( forall y ( forall x phi ) ) )",
+        "rule": "axm.implies-intr",
+        "cites": [{ "tag": "Range", "contents": [1, 5] }]
+      }
+    ]
+  },
+  {
     "name": "sbid",
     "allowedSubs": { "phi": ["x"] },
     "premises": [],
