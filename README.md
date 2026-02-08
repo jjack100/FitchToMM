@@ -29,33 +29,63 @@ The resulting executable will be under `./result/bin/fitch2mm`.
 
 ### Running fitch2mm
 `fitch2mm` can be passed a JSON file to be read (see the `examples` directory for what format is expected).
-Usage of the command is:
+The `gen` subcommand can be used to generate a Metamath file:
 ```
-Usage: fitch2mm [[-o|--output OUTPUT_FILE] | (-d|--display PROOF_NAME)] INPUT_FILE
+Usage: fitch2mm gen INPUT_FILE [-o|--output OUTPUT_FILE] 
+                    [(-n|--normal) | (-p|--packed) | (-c|--compressed)]
 
-Output Mode Options
+  Generate a Metamath file from JSON input
+
+Available options:
   -o,--output OUTPUT_FILE  File the generated Metamath will be written to
                            (default: "out.mm")
   -n,--normal              Output normal (uncompressed) format
   -p,--packed              Output packed format
   -c,--compressed          Output compressed format (default)
-
-Display Mode Options
-  -d,--display PROOF_NAME  Display a specific proof instead of generating
-                           Metamath
-  -f,--fitch               Show displayed proof in Fitch-style (default)
-  -s,--sequent             Show displayed proof in sequent style
-
-Available options:
   -h,--help                Show this help text
 ```
-For example, to read the theorems from the `examples` directory:
+For example, to generate the theorems from the `examples` directory:
 ```
-./result/bin/fitch2mm -o example.mm ./examples/theorems.json
+./result/bin/fitch2mm gen -o example.mm ./examples/theorems.json
 ```
 This will generate the output `example.mm` in the current directory.
 If any mistakes are encountered, it will emit warnings but still try to generate the rest of the proof, inserting `?`s in place of the problematic steps.
 (It is also possible that the proof will be fully completed despite the presence of mistakes, if the steps with mistakes ultimately go unused.)
+
+### Displaying proofs
+The `show` subcommand can be used to display a specific proof:
+```
+Usage: fitch2mm show INPUT_FILE (-n|--name ITEM_NAME) 
+                     [(-f|--fitch) | (-s|--sequent)] [--sexpr]
+
+  Display a specific theorem
+
+Available options:
+  -n,--name ITEM_NAME      Name of the item to display
+  -f,--fitch               Show proof in Fitch-style (default)
+  -s,--sequent             Show proof in sequent style
+  --sexpr                  Display formulae as raw S-Expressions (as they appear
+                           in the Metamath database)
+  -h,--help                Show this help text
+```
+For example, to show a Fitch-style proof of the law of excluded middle:
+```
+$ fitch2mm show --name law-of-excluded-middle examples/theorems.json 
+law-of-excluded-middle:
+
+1 │ │ ¬(φ ∨ ¬φ)   Assumption
+  │ ├──────────   
+2 │ │ │ φ         Assumption
+  │ │ ├──         
+3 │ │ │ (φ ∨ ¬φ)  axm.or-intr 2
+4 │ │ │ ⊥         axm.not-elim 3, 1
+  │ │             
+5 │ │ ¬φ          axm.not-intr 2–4
+6 │ │ (φ ∨ ¬φ)    axm.or-intr 5
+7 │ │ ⊥           axm.not-elim 6, 1
+  │               
+8 │ (φ ∨ ¬φ)      axm.ip 1–7
+```
 
 ### Verifying generated proofs
 The Nix flake also provides a development shell that includes the [metamath program](https://github.com/metamath/metamath-exe) and [mmj2](https://github.com/digama0/mmj2), which can be used to verify the generated proofs.

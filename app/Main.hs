@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
 module Main (main) where
 
@@ -39,70 +40,88 @@ data ProofFormat = Normal | Packed | Compressed
 
 data DisplayStyle = Fitch | Sequent
 
-data Options
-  = OutputOptions FilePath ProofFormat
-  | DisplayOptions T.Text DisplayStyle Bool
+data Commands
+  = GenOptions
+      { cmdInputFile :: FilePath,
+        cmdOutputFile :: FilePath,
+        cmdFormat :: ProofFormat
+      }
+  | ShowOptions
+      { cmdInputFile :: FilePath,
+        cmdItemName :: T.Text,
+        cmdStyle :: DisplayStyle,
+        cmdSExpr :: Bool
+      }
 
-data Args = Args Options FilePath
-
-outputOptionsParser :: Parser Options
-outputOptionsParser =
-  parserOptionGroup "Output Mode Options" $
-    OutputOptions
-      <$> strOption
-        ( long "output"
-            <> short 'o'
-            <> value "out.mm"
-            <> showDefault
-            <> metavar "OUTPUT_FILE"
-            <> help "File the generated Metamath will be written to"
+commandParser :: Parser Commands
+commandParser =
+  subparser
+    ( command
+        "gen"
+        ( info
+            (genParser <**> helper)
+            (progDesc "Generate a Metamath file from JSON input")
         )
-      <*> formatParser
+        <> command
+          "show"
+          ( info
+              (showParser <**> helper)
+              (progDesc "Display a specific theorem")
+          )
+    )
+
+genParser :: Parser Commands
+genParser =
+  GenOptions
+    <$> strArgument (metavar "INPUT_FILE")
+    <*> strOption
+      ( long "output"
+          <> short 'o'
+          <> value "out.mm"
+          <> showDefault
+          <> metavar "OUTPUT_FILE"
+          <> help "File the generated Metamath will be written to"
+      )
+    <*> formatParser
 
 formatParser :: Parser ProofFormat
 formatParser =
-  flag Compressed Normal (long "normal" <> short 'n' <> hidden <> help "Output normal (uncompressed) format")
-    <|> flag Compressed Packed (long "packed" <> short 'p' <> hidden <> help "Output packed format")
-    <|> flag Compressed Compressed (long "compressed" <> short 'c' <> hidden <> help "Output compressed format (default)")
+  flag Compressed Normal (long "normal" <> short 'n' <> help "Output normal (uncompressed) format")
+    <|> flag Compressed Packed (long "packed" <> short 'p' <> help "Output packed format")
+    <|> flag Compressed Compressed (long "compressed" <> short 'c' <> help "Output compressed format (default)")
 
-displayOptionsParser :: Parser Options
-displayOptionsParser =
-  parserOptionGroup "Display Mode Options" $
-    DisplayOptions
-      <$> strOption
-        ( long "display"
-            <> short 'd'
-            <> metavar "PROOF_NAME"
-            <> help "Display a specific proof instead of generating Metamath"
-        )
-      <*> styleParser
-      <*> switch (long "sexpr" <> help "Display formulae as raw S-Expressions (as they appear in the Metamath database)")
+showParser :: Parser Commands
+showParser =
+  ShowOptions
+    <$> strArgument (metavar "INPUT_FILE")
+    <*> strOption
+      ( long "name"
+          <> short 'n'
+          <> metavar "ITEM_NAME"
+          <> help "Name of the item to display"
+      )
+    <*> styleParser
+    <*> switch (long "sexpr" <> help "Display formulae as raw S-Expressions (as they appear in the Metamath database)")
 
 styleParser :: Parser DisplayStyle
 styleParser =
-  flag Fitch Fitch (long "fitch" <> short 'f' <> hidden <> help "Show displayed proof in Fitch-style (default)")
-    <|> flag Fitch Sequent (long "sequent" <> short 's' <> hidden <> help "Show displayed proof in sequent style")
-
-argsParser :: Parser Args
-argsParser =
-  Args
-    <$> (outputOptionsParser <|> displayOptionsParser)
-    <*> strArgument (metavar "INPUT_FILE")
+  flag Fitch Fitch (long "fitch" <> short 'f' <> help "Show proof in Fitch-style (default)")
+    <|> flag Fitch Sequent (long "sequent" <> short 's' <> help "Show proof in sequent style")
 
 main :: IO ()
 main = do
-  Args options inputFile <-
-    execParser $ info (argsParser <**> helper) briefDesc
+  cmd <- execParser $ info (commandParser <**> helper) briefDesc
+  let inputFile = cmdInputFile cmd
   content <- BL.readFile inputFile
   collection <- either (errorOut . T.pack) pure $ eitherDecode content
-  case options of
-    (OutputOptions outputFile format) ->
+  case cmd of
+    (GenOptions _ outputFile format) ->
       generateDatabase
         (T.pack inputFile)
         collection
         format
         outputFile
-    (DisplayOptions thmName dispStyle asSExpr) ->
+    (ShowOptions _ thmName dispStyle asSExpr) ->
       displayTheorem asSExpr thmName collection dispStyle
 
 generateDatabase :: T.Text -> Collection -> ProofFormat -> FilePath -> IO ()
