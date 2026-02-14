@@ -52,7 +52,7 @@ data Wff
 data BinOp = OpAnd | OpOr | OpImplies | OpIff
   deriving (Show, Eq, Ord)
 
-data Quantifier = QntForall | QntExists | QntUnique
+data Quantifier = QntForall | QntExists | QntUnique | QntFor
   deriving (Show, Eq, Ord)
 
 data Term

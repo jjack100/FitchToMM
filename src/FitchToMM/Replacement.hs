@@ -2,7 +2,6 @@
 
 module FitchToMM.Replacement
   ( proveReplWff,
-    solveForVar,
     solveForTrm,
     solveForWff,
   )
@@ -10,26 +9,13 @@ where
 
 import Control.Monad (guard, zipWithM)
 import qualified Control.Monad.Writer.Strict as W
-import Data.Foldable
 import Data.Monoid (First (..))
-import qualified Data.Set as S
 import qualified Data.Text as T
 import FitchToMM.FitchProof (AllowedSubs)
 import FitchToMM.Matcher (varsInLst, varsInTrm, varsInWff)
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.SyntaxProver
-
--- Given two formulae P and Q, and a variable x, determine what (if any)
--- variable a exists in Q such that P replaces a in Q with x
-solveForVar :: AllowedSubs -> Wff -> Wff -> T.Text -> Maybe T.Text
-solveForVar freeIn p q x = asum $ S.map getIfValid (varsInWff q)
-  where
-    getIfValid (VarHyp a) =
-      if succeeded $ proveReplWff freeIn p a q (TrmVar x)
-        then Just a
-        else Nothing
-    getIfValid _ = Nothing
 
 -- Given two formulae P and Q, and a variable x, determine what (if any) term
 -- t exists such that P replaces x in Q with t
@@ -201,37 +187,6 @@ proveReplWff _ (WffSub t x w) x' w' t'
       tPrf <- proveTrm t
       sPrf <- proveStep subSub1Step
       return $ wPrf <> xPrf <> tPrf <> sPrf
-proveReplWff freeIn (WffSub t1 y ph) x (WffSub t2 y' ps) t3
-  | y == y',
-    y /= x,
-    not $ occursInTrm freeIn y t3 =
-      do
-        reqDisjoint (VarHyp x) (VarHyp y)
-        reqDisjointFor (VarHyp y) (varsInTrm t3)
-        phPrf <- proveWff ph
-        psPrf <- proveWff ps
-        xPrf <- proveVar x
-        yPrf <- proveVar y
-        t1Prf <- proveTrm t1
-        t2Prf <- proveTrm t2
-        t3Prf <- proveTrm t3
-        let fHyps = phPrf <> psPrf <> xPrf <> yPrf <> t1Prf <> t2Prf <> t3Prf
-        r1Prf <- proveReplTrm freeIn t1 x t2 t3
-        r2Prf <- proveReplWff freeIn ph x ps t3
-        sPrf <- proveStep subSub2Step
-        return $ fHyps <> r1Prf <> r2Prf <> sPrf
-proveReplWff freeIn (WffSub t1 x ph) x' (WffSub t2 x'' ph') t3
-  | x == x',
-    x == x'',
-    ph == ph' = do
-      phPrf <- proveWff ph
-      xPrf <- proveVar x
-      t1Prf <- proveTrm t1
-      t2Prf <- proveTrm t2
-      t3Prf <- proveTrm t3
-      rPrf <- proveReplTrm freeIn t1 x t2 t3
-      sPrf <- proveStep subSub3Step
-      return $ phPrf <> xPrf <> t1Prf <> t2Prf <> t3Prf <> rPrf <> sPrf
 proveReplWff freeIn ph y (WffSub (TrmVar y') x ph') (TrmVar x')
   | ph == ph',
     x == x',
@@ -242,8 +197,23 @@ proveReplWff freeIn ph y (WffSub (TrmVar y') x ph') (TrmVar x')
         phPrf <- proveWff ph
         xPrf <- proveVar x
         yPrf <- proveVar y
-        sPrf <- proveStep subSub4Step
+        sPrf <- proveStep subSub2Step
         return $ phPrf <> xPrf <> yPrf <> sPrf
+proveReplWff freeIn (WffSub t1 y ph) x (WffSub t2 z ps) t3 =
+  do
+    phPrf <- proveWff ph
+    psPrf <- proveWff ps
+    xPrf <- proveVar x
+    yPrf <- proveVar y
+    zPrf <- proveVar z
+    t1Prf <- proveTrm t1
+    t2Prf <- proveTrm t2
+    t3Prf <- proveTrm t3
+    let fHyps = phPrf <> psPrf <> xPrf <> yPrf <> zPrf <> t1Prf <> t2Prf <> t3Prf
+    r1Prf <- proveReplTrm freeIn t1 x t2 t3
+    r2Prf <- proveReplWff freeIn (WffQnt QntFor y ph) x (WffQnt QntFor z ps) t3
+    sPrf <- proveStep subSub3Step
+    return $ fHyps <> r1Prf <> r2Prf <> sPrf
 proveReplWff _ _ _ _ _ = W.lift $ Left Inapplicable
 
 proveReplLst :: AllowedSubs -> [Term] -> T.Text -> [Term] -> Term -> ProofWriter
@@ -367,10 +337,7 @@ subSub1Step :: RpnStep
 subSub1Step = RpnStep 3 "sub.sub-1"
 
 subSub2Step :: RpnStep
-subSub2Step = RpnStep 9 "sub.sub-2"
+subSub2Step = RpnStep 3 "sub.sub-2"
 
 subSub3Step :: RpnStep
-subSub3Step = RpnStep 6 "sub.sub-3"
-
-subSub4Step :: RpnStep
-subSub4Step = RpnStep 3 "sub.sub-4"
+subSub3Step = RpnStep 10 "sub.sub-3"

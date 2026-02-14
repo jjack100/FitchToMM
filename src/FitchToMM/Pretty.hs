@@ -144,6 +144,7 @@ prettyQnt :: Quantifier -> Doc a
 prettyQnt QntForall = "forall"
 prettyQnt QntExists = "exists"
 prettyQnt QntUnique = "unique"
+prettyQnt QntFor = "for"
 
 prettySExpr :: [Doc a] -> Doc a
 prettySExpr items = lparen <+> align (sep items) <+> rparen

@@ -139,6 +139,8 @@ prettierWff a (WffQnt QntExists var wff) =
   "∃" <> var <> prettierWff a wff
 prettierWff a (WffQnt QntUnique var wff) =
   "∃!" <> var <> prettierWff a wff
+prettierWff a (WffQnt QntFor var wff) =
+  "FOR" <> var <> prettierWff a wff
 prettierWff a (WffSub trm var wff) =
   let wffTxt = case wff of
         -- Add parens around prefix operators to prevent possible ambiguity

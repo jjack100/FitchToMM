@@ -120,6 +120,7 @@ qntStep :: Quantifier -> RpnStep
 qntStep QntForall = RpnStep 0 "qnt.forall"
 qntStep QntExists = RpnStep 0 "qnt.exists"
 qntStep QntUnique = RpnStep 0 "qnt.unique"
+qntStep QntFor = RpnStep 0 "qnt.for"
 
 wffQntStep :: RpnStep
 wffQntStep = RpnStep 3 "wff.qnt"

@@ -439,36 +439,35 @@ $( Case for where the substitution describes the very replacement at hand $)
 sub.sub-1 $a ; ( sub trm_1 x phi ) REPLACES x IN phi WITH trm_1 $.
 
 ${
-  $d y trm_3 $. $d x y $.
-  sub.sub-2.1 $e ; trm_1 REPLACES x IN trm_2 WITH trm_3 $.
-  sub.sub-2.2 $e ; phi REPLACES x IN psi WITH trm_3 $.
-  $( In the case where the substitution does not describe the replacement at
-     hand, we recurse through it. Note the similarity with our capture-
-     avoidance rules for quantifiers: we do not want the term being inserted
-     to contain the variable that the outer substitution is replacing, lest it
-     tacitly tampers with the term. Nor do we want to replace occurrences of the
-     variable 'y', which should be considered substitued away in the expression
-     phi[trm_1/y] (i.e., not occuring unless y also occurs in trm_1). $)
-  sub.sub-2   $a ; ( sub trm_1 y phi ) REPLACES x IN ( sub trm_2 y psi ) WITH trm_3 $.
-$} 
-
-${
-  sub.sub-3.1 $e ; trm_1 REPLACES x IN trm_2 WITH trm_3 $.
-  $( 'x' should not be regarded as occuring in the expression phi[trm_1/x]
-     except for where it occurs in trm_1, so a replacement of x should not alter
-     phi. Where sub.sub-2 can be seen as having constraints analagous to
-     sub.qnt, this can be seen as analagous to sub.qnt-bound. $)
-  sub.sub-3   $a ; ( sub trm_1 x phi ) REPLACES x IN ( sub trm_2 x phi ) WITH trm_3 $.
-$}
-
-${
   $d y phi $.
   $( If we replace a variable x with y, then replace y back with x, we return
      to the original formula so long as 'y' was fresh (i.e., not previously
      occurring in the formula). This rule provides a means for inference rules
      that take replacement statements as hypotheses to 'eliminate' the
      substitution operator (simplifying the expression). $)
-  sub.sub-4 $a ; phi REPLACES y IN ( sub y x phi ) WITH x $.
+  sub.sub-2 $a ; phi REPLACES y IN ( sub y x phi ) WITH x $.
+$}
+
+$( In the case where the substitution does not describe the replacement at
+   hand, we recurse through it, but require an analogous constraint to our
+   capture-avoidance rules for quantifiers: we do not want the term being
+   inserted to contain the variable that the outer substitution is replacing,
+   lest it tacitly tampers with the term. Nor do we want to replace occurrences
+   of the variable 'y', which should be considered substitued away in the
+   expression phi[trm_1/y] (i.e., not occuring unless y also occurs in trm_1).
+   
+   To reuse our existing capture-avoidance rules, we will introduce a "dummy"
+   quantifier called "for" to denote the syntactic status 'y' has in the
+   expression "substitute t for y in phi". $)
+
+$c for $.
+qnt.for $a qnt for $.
+
+${
+  sub.sub-3.1 $e ; trm_1 REPLACES x IN trm_2 WITH trm_3 $.
+  sub.sub-3.2 $e ; ( for y phi ) REPLACES x IN ( for z psi ) WITH trm_3 $.
+  $( Case for where the substitution does not describe the replacement at hand $)
+  sub.sub-3   $a ; ( sub trm_1 y phi ) REPLACES x IN ( sub trm_2 z psi ) WITH trm_3 $.
 $}
 
 $( -------- Uniqueness Quantification -------- $)

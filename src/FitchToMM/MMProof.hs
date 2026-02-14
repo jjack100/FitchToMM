@@ -5,6 +5,7 @@ module FitchToMM.MMProof (Fact (..), MMProof (..), fromFitchProof) where
 import Control.Applicative ((<|>))
 import Control.Monad
 import Control.Monad.Writer.Strict
+import Data.Foldable (asum)
 import Data.List
 import qualified Data.Map.Strict as M
 import Data.Maybe
@@ -277,12 +278,17 @@ proveForallI allowed sub = do
   phi <- lookupWff "phi" sub
   psi <- lookupWff "psi" sub
   x <- lookupVar "x" sub
-  -- Solve for the substitution needed for 'a', or default to a dummy variable
-  -- to try the trivial case where x does not occur in ψ
-  let a = fromMaybe "_a" (solveForVar allowed psi phi x)
-  fullSub <- merge sub $ singletonVar "a" a
-  let replPrf = proveReplWff allowed psi a phi (TrmVar x)
-  return (fullSub, [replPrf])
+  -- Solve for the substitution needed for 'a', also trying a dummy variable
+  -- _a for the trivial case where x does not occur in ψ
+  let candidates = varsInWff phi <> (S.singleton $ VarHyp "_a")
+      tryCandidate cand = do
+        let candName = fHypName cand
+            replPrf = proveReplWff allowed psi candName phi (TrmVar x)
+        guard $ succeeded replPrf
+        fullSub <- merge sub $ singletonVar "a" candName
+        return $ (fullSub, [replPrf])
+
+  asum $ map tryCandidate $ S.toList candidates
 
 proveExistsI :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveExistsI allowed sub = do
