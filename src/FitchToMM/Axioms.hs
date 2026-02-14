@@ -185,7 +185,7 @@ axioms =
           [ Condition Nothing (expr "( eq trm_1 trm_2 )"),
             Condition Nothing (expr "phi")
           ]
-          [mkDVR (CtxHyp "x") (VarHyp "trm_1"), mkDVR (CtxHyp "x") (VarHyp "trm_2")]
+          [mkDVR (VarHyp "x") (TrmHyp "trm_1"), mkDVR (VarHyp "x") (TrmHyp "trm_2")]
       ),
       ( "thm.eq-elim-2",
         Fact
@@ -194,7 +194,7 @@ axioms =
           [ Condition Nothing (expr "( eq trm_1 trm_2 )"),
             Condition Nothing (expr "psi")
           ]
-          [mkDVR (CtxHyp "x") (VarHyp "trm_1"), mkDVR (CtxHyp "x") (VarHyp "trm_2")]
+          [mkDVR (VarHyp "x") (TrmHyp "trm_1"), mkDVR (VarHyp "x") (TrmHyp "trm_2")]
       )
     ]
 

@@ -220,6 +220,18 @@ proveReplWff freeIn (WffSub t1 y ph) x (WffSub t2 y' ps) t3
         r2Prf <- proveReplWff freeIn ph x ps t3
         sPrf <- proveStep subSub2Step
         return $ fHyps <> r1Prf <> r2Prf <> sPrf
+proveReplWff freeIn (WffSub t1 x ph) x' (WffSub t2 x'' ph') t3
+  | x == x',
+    x == x'',
+    ph == ph' = do
+      phPrf <- proveWff ph
+      xPrf <- proveVar x
+      t1Prf <- proveTrm t1
+      t2Prf <- proveTrm t2
+      t3Prf <- proveTrm t3
+      rPrf <- proveReplTrm freeIn t1 x t2 t3
+      sPrf <- proveStep subSub3Step
+      return $ phPrf <> xPrf <> t1Prf <> t2Prf <> t3Prf <> rPrf <> sPrf
 proveReplWff freeIn ph y (WffSub (TrmVar y') x ph') (TrmVar x')
   | ph == ph',
     x == x',
@@ -230,7 +242,7 @@ proveReplWff freeIn ph y (WffSub (TrmVar y') x ph') (TrmVar x')
         phPrf <- proveWff ph
         xPrf <- proveVar x
         yPrf <- proveVar y
-        sPrf <- proveStep subSub3Step
+        sPrf <- proveStep subSub4Step
         return $ phPrf <> xPrf <> yPrf <> sPrf
 proveReplWff _ _ _ _ _ = W.lift $ Left Inapplicable
 
@@ -358,4 +370,7 @@ subSub2Step :: RpnStep
 subSub2Step = RpnStep 9 "sub.sub-2"
 
 subSub3Step :: RpnStep
-subSub3Step = RpnStep 3 "sub.sub-3"
+subSub3Step = RpnStep 6 "sub.sub-3"
+
+subSub4Step :: RpnStep
+subSub4Step = RpnStep 3 "sub.sub-4"

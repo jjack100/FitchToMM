@@ -52,6 +52,7 @@ library
   exposed-modules:
     FitchToMM.Axioms
     FitchToMM.Compressed
+    FitchToMM.Definitions
     FitchToMM.Fact
     FitchToMM.FitchProof
     FitchToMM.MMProof

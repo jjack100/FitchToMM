@@ -12,6 +12,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import FitchToMM.Axioms
+import FitchToMM.Definitions
 import FitchToMM.Fact
 import FitchToMM.FitchProof
 import FitchToMM.Matcher
@@ -113,67 +114,80 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
     step i fs@(FlatStep _ _ (Reference "axm.eq-elim") _ _) = choice i fs ["axm.eq-elim-1", "thm.eq-elim-2"]
     -- Handle references to the definition of substitution
     step i fs@(FlatStep _ _ (Reference "def.sub") _ _) =
-      let intrPrf = proveSubI i fs
-          elimPrf = proveSubE i fs
+      let intrPrf = proveDefI (proveDefSub allowedSubs) i fs
+          elimPrf = proveDefE (proveDefSub allowedSubs) i fs
        in if succeeded intrPrf then intrPrf else elimPrf
     -- Handle application of a referenced rule
-    step i (FlatStep ctx wff (Reference ref) citations _) = do
-      Fact claim fHyps eHyps dConds <- try (lookupFact ref) UnrecognizedFact
-      -- Verify we are citing the correct number of lines for the fact we are referencing
-      unless (length citations == length eHyps) (lift $ Left BadCiteCount)
-      citedSteps <- lift $ mapM (lookupStep i ctx) citations
-      -- See if a valid substitution exists
-      let ctxSub = singletonCtx ctx
-      stmtSub <- try (wff `matchTo` claim) Inapplicable
-      hypSubs <- try (zipWithM verifyEHyp citedSteps eHyps) Inapplicable
-      merged <- try (mergeFold $ ctxSub : stmtSub : hypSubs) Inapplicable
-      -- Handle rules requiring replacement statements as special cases
-      let result = case ref of
-            "axm.forall-intr" -> proveForallI allowedSubs merged
-            "axm.exists-intr" -> proveExistsI allowedSubs merged
-            "axm.forall-elim" -> proveForallE allowedSubs merged
-            "axm.exists-elim" -> proveExistsE allowedSubs merged
-            "axm.eq-elim-1" -> proveEqE allowedSubs merged
-            "thm.eq-elim-2" -> proveEqE allowedSubs merged
-            _ -> Just (merged, [])
-      (fullSub, replacements) <- try result Inapplicable
-      applyDConds fullSub dConds
-      fHypPrfs <- mapM (proveFHyp fullSub) fHyps
-      replPrfs <- sequence replacements
-      eHypPrfs <- mapM (lookupProof i ctx) citations
-      let numMandHyps = length fHyps + length eHyps + length replacements
-      labelProof <- proveStep $ RpnStep numMandHyps ref
-      return $
-        mconcat fHypPrfs
-          <> mconcat replPrfs
-          <> mconcat eHypPrfs
-          <> labelProof
+    step i fs@(FlatStep ctx wff (Reference ref) citations _)
+      | Just (Fact claim fHyps eHyps dvr) <- lookupFact ref = do
+          -- Verify we are citing the correct number of lines for the fact we are referencing
+          unless (length citations == length eHyps) (lift $ Left BadCiteCount)
+          citedSteps <- lift $ mapM (lookupStep i ctx) citations
+          -- See if a valid substitution exists
+          let ctxSub = singletonCtx ctx
+          stmtSub <- try (wff `matchTo` claim) Inapplicable
+          hypSubs <- try (zipWithM verifyEHyp citedSteps eHyps) Inapplicable
+          merged <- try (mergeFold $ ctxSub : stmtSub : hypSubs) Inapplicable
+          -- Handle rules requiring replacement statements as special cases
+          let result = case ref of
+                "axm.forall-intr" -> proveForallI allowedSubs merged
+                "axm.exists-intr" -> proveExistsI allowedSubs merged
+                "axm.forall-elim" -> proveForallE allowedSubs merged
+                "axm.exists-elim" -> proveExistsE allowedSubs merged
+                "axm.eq-elim-1" -> proveEqE allowedSubs merged
+                "thm.eq-elim-2" -> proveEqE allowedSubs merged
+                _ -> Just (merged, [])
+          (fullSub, replacements) <- try result Inapplicable
+          applyDVRs fullSub dvr
+          fHypPrfs <- mapM (proveFHyp fullSub) fHyps
+          replPrfs <- sequence replacements
+          eHypPrfs <- mapM (lookupProof i ctx) citations
+          let numMandHyps = length fHyps + length eHyps + length replacements
+          labelProof <- proveStep $ RpnStep numMandHyps ref
+          return $
+            mconcat fHypPrfs
+              <> mconcat replPrfs
+              <> mconcat eHypPrfs
+              <> labelProof
+      | Just (Definition definiendum definiens fHyps dvr) <- lookupDef ref =
+          let proveDef fromDefiniendum fromDefiniens = do
+                sub1 <- try (fromDefiniendum `matchTo` definiendum) Inapplicable
+                sub2 <- try (fromDefiniens `matchTo` definiens) Inapplicable
+                fullSub <- try (merge sub1 sub2) Inapplicable
+                applyDVRs fullSub dvr
+                fHypPrfs <- mapM (proveFHyp fullSub) fHyps
+                labelProof <- proveStep $ RpnStep (length fHypPrfs) ref
+                return $ mconcat fHypPrfs <> labelProof
+              intrPrf = proveDefI proveDef i fs
+              elimPrf = proveDefE proveDef i fs
+           in if succeeded intrPrf then intrPrf else elimPrf
+      | otherwise = lift $ Left UnrecognizedFact
 
-    -- Prove the introduction of a substitution
-    proveSubI :: Int -> FlatStep -> ProofWriter
-    proveSubI i (FlatStep ctx wff _ [citation] _) = do
+    -- Prove the introduction of a definition
+    proveDefI :: (Definiendum -> Definiens -> ProofWriter) -> Int -> FlatStep -> ProofWriter
+    proveDefI proveDef i (FlatStep ctx wff _ [citation] _) = do
       (FlatStep _ cited _ _ _) <- lift $ lookupStep i ctx citation
       sub <- try (mergeFold [singletonCtx ctx, singletonWff "phi" wff, singletonWff "psi" cited]) Inapplicable
       let fHyps = [CtxHyp "...", WffHyp "phi", WffHyp "psi"]
       fHypPrfs <- mapM (proveFHyp sub) fHyps
-      defSubPrf <- proveDefSub allowedSubs wff cited
+      defSubPrf <- proveDef wff cited
       citedPrf <- lookupProof i ctx citation
       labelProof <- proveStep $ RpnStep 5 "axm.def-intr"
       return $ mconcat fHypPrfs <> defSubPrf <> citedPrf <> labelProof
-    proveSubI _ _ = lift $ Left BadCiteCount
+    proveDefI _ _ _ = lift $ Left BadCiteCount
 
-    -- Prove the elimination of a substitution
-    proveSubE :: Int -> FlatStep -> ProofWriter
-    proveSubE i (FlatStep ctx wff _ [citation] _) = do
+    -- Prove the elimination of a definition
+    proveDefE :: (Definiendum -> Definiens -> ProofWriter) -> Int -> FlatStep -> ProofWriter
+    proveDefE proveDef i (FlatStep ctx wff _ [citation] _) = do
       (FlatStep _ cited _ _ _) <- lift $ lookupStep i ctx citation
       sub <- try (mergeFold [singletonCtx ctx, singletonWff "phi" cited, singletonWff "psi" wff]) Inapplicable
       let fHyps = [CtxHyp "...", WffHyp "phi", WffHyp "psi"]
       fHypPrfs <- mapM (proveFHyp sub) fHyps
-      defSubPrf <- proveDefSub allowedSubs cited wff
+      defSubPrf <- proveDef cited wff
       citedPrf <- lookupProof i ctx citation
       labelProof <- proveStep $ RpnStep 5 "axm.def-elim"
       return $ mconcat fHypPrfs <> defSubPrf <> citedPrf <> labelProof
-    proveSubE _ _ = lift $ Left BadCiteCount
+    proveDefE _ _ _ = lift $ Left BadCiteCount
 
     -- Try several possible references, and take the first that succeeds
     choice :: Int -> FlatStep -> [T.Text] -> ProofWriter
@@ -214,10 +228,11 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
            in if succeeded prf then prf else pure $ fst $ runProofWriter prf
 
     lookupFact ref = (axioms M.!? ref) <|> (lookupThm ref)
+    lookupDef ref = (baseDefinitions M.!? ref)
 
 -- Apply disjoint variable conditions
-applyDConds :: Substitution -> [DVR] -> PropWriter
-applyDConds sub dConds = do
+applyDVRs :: Substitution -> [DVR] -> PropWriter
+applyDVRs sub dConds = do
   disjointVars <- try (checkDisjoints sub dConds) Inapplicable
   mapM_ applyDVR disjointVars
 
