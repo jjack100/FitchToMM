@@ -5,33 +5,51 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TypeOperators #-}
 
-module FitchToMM.Schema
-  ( Theorem,
-    Fact,
-    parseTheorem,
-    parseFact,
-    getName,
-  )
-where
+module FitchToMM.Schema where
 
 import Control.Monad
 import Data.Aeson
+import Data.Bifunctor (first)
 import Data.Char (isAlphaNum, isAscii)
 import qualified Data.Map.Strict as M
 import Data.OpenApi
 import qualified Data.Text as T
-import qualified FitchToMM.Fact as MMFact
+import FitchToMM.Collection (fromListE)
+import qualified FitchToMM.Collection as C
+import FitchToMM.Declarations (toLanguage)
+import qualified FitchToMM.Declarations as D
 import qualified FitchToMM.FitchProof as F
-import FitchToMM.Parser
+import qualified FitchToMM.MMProof as MM
+import qualified FitchToMM.Parser as P
 import qualified FitchToMM.ProofWriter as PW
 import GHC.Generics
 
-data Theorem = Theorem
-  { name :: MMLabel,
-    allowedSubs :: AllowedSubs,
-    premises :: [EHyp],
-    steps :: [ProofStep]
+data Collection = Collection
+  { title :: T.Text,
+    items :: [Item]
   }
+  deriving stock (Generic)
+  deriving anyclass (ToSchema, FromJSON)
+
+data Item
+  = Theorem
+      { label :: MMLabel,
+        allowedSubs :: AllowedSubs,
+        premises :: [EHyp],
+        steps :: [ProofStep]
+      }
+  | Definition
+      { label :: MMLabel,
+        allowedSubs :: AllowedSubs,
+        symbolType :: SymbolType,
+        definedTerm :: T.Text,
+        definiendum :: T.Text,
+        definiens :: T.Text
+      }
+  deriving stock (Generic)
+  deriving anyclass (ToSchema, FromJSON)
+
+data SymbolType = Predicate Int | Function Int | Constant
   deriving stock (Generic)
   deriving anyclass (ToSchema, FromJSON)
 
@@ -91,18 +109,36 @@ data EHyp = EHyp
   deriving stock (Generic)
   deriving anyclass (ToSchema, FromJSON)
 
-getName :: Theorem -> T.Text
-getName (Theorem (MMLabel thmName) _ _ _) = thmName
+parseCollection :: D.DeclMap -> Collection -> Either T.Text C.Collection
+parseCollection declMap (Collection cTitle cItems) =
+  fromListE cTitle declMap (map parseItem cItems)
 
-parseTheorem :: Language -> Theorem -> Either T.Text F.FitchProof
-parseTheorem l (Theorem (MMLabel thmName) thmAllowedSubs thmPrems thmSteps) = do
-  parsedPrems <- mapM (parseEHyp l) thmPrems
-  parsedSteps <- mapM (parseProofStep l) thmSteps
-  let AllowedSubs subs = thmAllowedSubs
-  let subsFunc = \x -> M.findWithDefault [] x subs
-  return $ F.FitchProof thmName subsFunc parsedPrems parsedSteps
+parseItem :: Item -> D.DeclMap -> Either T.Text C.Item
+parseItem (Theorem (MMLabel itmName) itmAllowedSubs itmPrems itmSteps) declMap = do
+  let l = toLanguage declMap
+  parsedPrems <- mapM (parseEHyp l) itmPrems
+  parsedSteps <- mapM (parseProofStep l) itmSteps
+  let AllowedSubs subs = itmAllowedSubs
+      subsFunc x = M.findWithDefault [] x subs
+      fitchProof = F.FitchProof itmName subsFunc parsedPrems parsedSteps
+      maybeMMProof = MM.fromFitchProof declMap fitchProof
+  mmProof <- maybe (Left "Empty theorem") Right maybeMMProof
+  return $ C.TheoremItem fitchProof mmProof
+parseItem (Definition (MMLabel itmName) itmAllowedSubs itmSymType itmDefinedTerm itmDefiniendum itmDefiniens) declMap = do
+  let symTyp = parseSymbolType itmSymType
+      symSig x = if x == itmDefinedTerm then Just symTyp else Nothing
+      l = P.union (toLanguage declMap) (P.Language symSig)
+      AllowedSubs subs = itmAllowedSubs
+      subsFunc x = M.findWithDefault [] x subs
+  def <- first T.show $ D.mkDef itmDefiniendum itmDefiniens subsFunc l
+  return $ C.DefinitionItem itmName subsFunc symTyp itmDefinedTerm def
 
-parseProofStep :: Language -> ProofStep -> Either T.Text F.FitchStep
+parseSymbolType :: SymbolType -> P.SymbolType
+parseSymbolType (Predicate arity) = P.SymPredicate arity
+parseSymbolType (Function arity) = P.SymFunction arity
+parseSymbolType Constant = P.SymConstant
+
+parseProofStep :: P.Language -> ProofStep -> Either T.Text F.FitchStep
 parseProofStep l (ProofStep prfExpr prfRule prfCites) = do
   parsedExpr <- parseExpr l prfExpr
   let parsedCites = map parseCitation prfCites
@@ -111,19 +147,6 @@ parseProofStep l (Subproof assump stps) = do
   parsedAssump <- parseExpr l assump
   parsedSteps <- mapM (parseProofStep l) stps
   return $ F.FitchSubproof parsedAssump parsedSteps
-
-parseFact :: Language -> Fact -> Either T.Text (T.Text, MMFact.Fact)
-parseFact l fact = do
-  parsedEHyps <- mapM (parseEHyp l) (eHyps fact)
-  parsedClaim <- parseExpr l (claim fact)
-  return
-    ( factName fact,
-      MMFact.Fact
-        parsedClaim
-        (map parseFHyp $ fHyps fact)
-        parsedEHyps
-        (map parseDVR $ dvrs fact)
-    )
 
 parseDVR :: (FHyp, FHyp) -> PW.DVR
 parseDVR (x, y) = PW.mkDVR (parseFHyp x) (parseFHyp y)
@@ -134,17 +157,17 @@ parseFHyp (TrmHyp txt) = PW.TrmHyp txt
 parseFHyp (WffHyp txt) = PW.WffHyp txt
 parseFHyp (CtxHyp txt) = PW.CtxHyp txt
 
-parseEHyp :: Language -> EHyp -> Either T.Text F.Condition
+parseEHyp :: P.Language -> EHyp -> Either T.Text D.Condition
 parseEHyp l (EHyp (Just sup) cond) = do
   parsedSup <- parseExpr l sup
   parsedCond <- parseExpr l cond
-  return $ F.Condition (Just parsedSup) parsedCond
+  return $ D.Condition (Just parsedSup) parsedCond
 parseEHyp l (EHyp Nothing cond) = do
   parsedCond <- parseExpr l cond
-  return $ F.Condition Nothing parsedCond
+  return $ D.Condition Nothing parsedCond
 
-parseExpr :: Language -> T.Text -> Either T.Text Wff
-parseExpr l expr = case parseFormula (primitives <> l) expr of
+parseExpr :: P.Language -> T.Text -> Either T.Text P.Wff
+parseExpr l expr = case P.parseFormula l expr of
   Left err -> Left $ T.pack $ show err
   Right res -> Right res
 

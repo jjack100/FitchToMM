@@ -3,6 +3,7 @@
 module FitchToMM.FitchProof where
 
 import qualified Data.Text as T
+import FitchToMM.Declarations (AllowedSubs, Condition (..))
 import FitchToMM.Parser
 
 data Citation = Line Int | Range Int Int
@@ -11,13 +12,6 @@ data Citation = Line Int | Range Int Int
 data FitchStep
   = FitchStep Wff T.Text [Citation]
   | FitchSubproof Wff [FitchStep]
-  deriving (Show)
-
-type AllowedSubs = T.Text -> [T.Text]
-
--- A condition can optionally be making a supposition, i.e., an assumption to be
--- discharged in the application of the fact it is conditioning
-data Condition = Condition (Maybe Wff) Wff
   deriving (Show)
 
 data FitchProof = FitchProof T.Text AllowedSubs [Condition] [FitchStep]

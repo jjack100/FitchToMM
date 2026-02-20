@@ -4,24 +4,23 @@
 
 module Main (main) where
 
-import Control.Monad (foldM, when)
-import Data.Aeson (FromJSON, eitherDecode)
+import Cli (Commands (..), DisplayStyle (..), ProofFormat (..), execCli)
+import Control.Monad (foldM)
+import Data.Aeson (eitherDecode)
 import qualified Data.ByteString.Lazy as BL
-import Data.Foldable (find, traverse_)
-import qualified Data.Map.Strict as M
+import Data.Foldable (traverse_)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Display
+import FitchToMM.Collection (Collection (..), Item (..), findItem)
 import FitchToMM.Compressed (compressProof, packProof)
+import FitchToMM.Declarations
 import FitchToMM.FitchProof (FitchProof (FitchProof), flattenProof)
 import FitchToMM.MMProof
-import FitchToMM.Parser (Language, primitives)
+import FitchToMM.Parser (SymbolType)
 import FitchToMM.Pretty
 import FitchToMM.ProofWriter
-import FitchToMM.Schema (parseTheorem)
 import qualified FitchToMM.Schema as Schema
-import GHC.Generics (Generic)
-import Options.Applicative
 import Paths_fitch_to_mm
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -29,145 +28,59 @@ import System.Console.ANSI
 import System.Exit (exitFailure)
 import System.IO (stderr, stdout)
 
-data Collection = Collection [Schema.Theorem]
-  deriving (Generic)
-
-instance FromJSON Collection
-
-data Database = Database T.Text (M.Map T.Text Fact) Language
-
-data ProofFormat = Normal | Packed | Compressed
-
-data DisplayStyle = Fitch | Sequent
-
-data Commands
-  = GenOptions
-      { cmdInputFile :: FilePath,
-        cmdOutputFile :: FilePath,
-        cmdFormat :: ProofFormat
-      }
-  | ShowOptions
-      { cmdInputFile :: FilePath,
-        cmdItemName :: T.Text,
-        cmdStyle :: DisplayStyle,
-        cmdSExpr :: Bool
-      }
-
-commandParser :: Parser Commands
-commandParser =
-  subparser
-    ( command
-        "gen"
-        ( info
-            (genParser <**> helper)
-            (progDesc "Generate a Metamath file from JSON input")
-        )
-        <> command
-          "show"
-          ( info
-              (showParser <**> helper)
-              (progDesc "Display a specific theorem")
-          )
-    )
-
-genParser :: Parser Commands
-genParser =
-  GenOptions
-    <$> strArgument (metavar "INPUT_FILE")
-    <*> strOption
-      ( long "output"
-          <> short 'o'
-          <> value "out.mm"
-          <> showDefault
-          <> metavar "OUTPUT_FILE"
-          <> help "File the generated Metamath will be written to"
-      )
-    <*> formatParser
-
-formatParser :: Parser ProofFormat
-formatParser =
-  flag Compressed Normal (long "normal" <> short 'n' <> help "Output normal (uncompressed) format")
-    <|> flag Compressed Packed (long "packed" <> short 'p' <> help "Output packed format")
-    <|> flag Compressed Compressed (long "compressed" <> short 'c' <> help "Output compressed format (default)")
-
-showParser :: Parser Commands
-showParser =
-  ShowOptions
-    <$> strArgument (metavar "INPUT_FILE")
-    <*> strOption
-      ( long "name"
-          <> short 'n'
-          <> metavar "ITEM_NAME"
-          <> help "Name of the item to display"
-      )
-    <*> styleParser
-    <*> switch (long "sexpr" <> help "Display formulae as raw S-Expressions (as they appear in the Metamath database)")
-
-styleParser :: Parser DisplayStyle
-styleParser =
-  flag Fitch Fitch (long "fitch" <> short 'f' <> help "Show proof in Fitch-style (default)")
-    <|> flag Fitch Sequent (long "sequent" <> short 's' <> help "Show proof in sequent style")
+newtype Database = Database T.Text
 
 main :: IO ()
 main = do
-  cmd <- execParser $ info (commandParser <**> helper) briefDesc
+  cmd <- execCli
   let inputFile = cmdInputFile cmd
   content <- BL.readFile inputFile
   collection <- either (errorOut . T.pack) pure $ eitherDecode content
+  parsedCollection <- either errorOut pure $ Schema.parseCollection base collection
   case cmd of
     (GenOptions _ outputFile format) ->
-      generateDatabase
-        (T.pack inputFile)
-        collection
+      genDatabase
+        parsedCollection
         format
         outputFile
-    (ShowOptions _ thmName dispStyle asSExpr) ->
-      displayTheorem asSExpr thmName collection dispStyle
+    (ShowOptions _ label dispStyle asSExpr) ->
+      displayItem asSExpr dispStyle parsedCollection label
 
-generateDatabase :: T.Text -> Collection -> ProofFormat -> FilePath -> IO ()
-generateDatabase name (Collection theorems) format outputFile = do
-  let heading = "\n\n" <> (makeHeading name)
+genDatabase :: Collection -> ProofFormat -> FilePath -> IO ()
+genDatabase (Collection title _ items) format outputFile = do
+  let heading = "\n\n" <> (makeHeading title)
   folPath <- getDataFileName "fol.mm"
   folMM <- TIO.readFile folPath
-  let base = Database (folMM <> heading) M.empty primitives
-  Database result _ _ <- foldM (appendTheorem format) base theorems
+  let baseContent = Database (folMM <> heading)
+  Database result <- foldM (appendItem format) baseContent items
   TIO.writeFile outputFile (result <> "\n")
 
   withColor stdout Vivid Green $ do
     TIO.putStr $ "Success! File generated at: "
     withBold stdout $ putStrLn outputFile
 
-displayTheorem :: Bool -> T.Text -> Collection -> DisplayStyle -> IO ()
-displayTheorem asSExpr thmName (Collection theorems) dispStyle = do
-  theorem <-
-    try
-      (find (\thm -> Schema.getName thm == thmName) theorems)
-      ("Theorem not found: " <> thmName)
-  fitchProof <- either errorOut pure $ parseTheorem primitives theorem
-  let (FitchProof _ allowedSubs _ _) = fitchProof
-  TIO.putStrLn $ case dispStyle of
-    Fitch -> prettyFitch asSExpr fitchProof
-    Sequent -> prettyFlat asSExpr thmName allowedSubs (flattenProof fitchProof)
+appendItem :: ProofFormat -> Database -> Item -> IO Database
+appendItem format db (TheoremItem _ proof) = appendTheorem format db proof
+appendItem _ db (DefinitionItem label _ symbolType definedTerm def) =
+  appendDefinition db label symbolType definedTerm def
 
-appendTheorem :: ProofFormat -> Database -> Schema.Theorem -> IO Database
-appendTheorem format (Database metamath facts lang) thm = do
-  fitchProof@(FitchProof name _ _ _) <- either errorOut pure $ parseTheorem lang thm
-  mmProof <-
-    try
-      (fromFitchProof ((M.!?) facts) fitchProof)
-      ("Empty theorem: " <> name)
-  let mmLabel = proofLabel mmProof
-  when (M.member mmLabel facts) (errorOut $ "Duplicate label encountered: " <> mmLabel)
-  (printMistakes name) (proofMistakes mmProof)
+appendTheorem :: ProofFormat -> Database -> MMProof -> IO Database
+appendTheorem format (Database content) proof = do
   let options = defaultLayoutOptions
-  let proofDoc = case format of
-        Normal -> prettyNormal mmProof
-        Packed -> prettyPacked $ packProof $ mmProof
-        Compressed -> prettyCompressed $ compressProof $ packProof mmProof
-  let proofText = renderStrict $ layoutSmart options proofDoc
-  let newDB = metamath <> "\n\n" <> proofText
-  let newFacts = M.insert mmLabel (proofFact mmProof) facts
-  return $ Database newDB newFacts lang
+      proofDoc = case format of
+        Normal -> prettyNormal proof
+        Packed -> prettyPacked $ packProof $ proof
+        Compressed -> prettyCompressed $ compressProof $ packProof proof
+      proofText = renderStrict $ layoutSmart options proofDoc
+  printMistakes (proofLabel proof) (proofMistakes proof)
+  return $ Database $ content <> "\n\n" <> proofText
+
+appendDefinition :: Database -> Label -> SymbolType -> T.Text -> Definition -> IO Database
+appendDefinition (Database content) label symbolType definedTerm definition = do
+  let options = defaultLayoutOptions
+      defDoc = prettyDefinition label symbolType definedTerm definition
+      defText = renderStrict $ layoutSmart options defDoc
+  return $ Database $ content <> "\n\n" <> defText
 
 printMistakes :: T.Text -> [(Int, Mistake)] -> IO ()
 printMistakes _ [] = pure ()
@@ -207,6 +120,24 @@ makeHeading text =
     <> T.replicate 80 "-"
     <> "\n"
     <> "$)"
+
+displayItem :: Bool -> DisplayStyle -> Collection -> Label -> IO ()
+displayItem asSExpr dispStyle collection label = do
+  item <- try (findItem collection label) ("Item not found: " <> label)
+  case item of
+    (TheoremItem fitchProof _) -> displayTheorem asSExpr dispStyle fitchProof
+    (DefinitionItem name allowedSubs _ _ def) -> displayDefinition asSExpr name allowedSubs def
+
+displayTheorem :: Bool -> DisplayStyle -> FitchProof -> IO ()
+displayTheorem asSExpr dispStyle theorem = do
+  let (FitchProof thmName allowedSubs _ _) = theorem
+  TIO.putStrLn $ case dispStyle of
+    Fitch -> prettyFitch asSExpr theorem
+    Sequent -> prettyFlat asSExpr thmName allowedSubs (flattenProof theorem)
+
+displayDefinition :: Bool -> Label -> AllowedSubs -> Definition -> IO ()
+displayDefinition asSExpr label allowedSubs def = do
+  TIO.putStrLn $ prettyDef asSExpr label allowedSubs def
 
 try :: Maybe a -> T.Text -> IO a
 try result msg = maybe (errorOut msg) pure result

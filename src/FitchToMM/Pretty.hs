@@ -9,6 +9,7 @@ module FitchToMM.Pretty
     prettyNormal,
     prettyCompressed,
     prettyDVR,
+    prettyDefinition,
   )
 where
 
@@ -18,10 +19,11 @@ import Data.Ord
 import qualified Data.Set as S
 import qualified Data.Text as T
 import FitchToMM.Compressed
-import FitchToMM.FitchProof
+import FitchToMM.Declarations (Condition (..), Definition (..))
 import FitchToMM.MMProof
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
+import FitchToMM.SyntaxProver (constStep, funcStep, prdStep)
 import Prettyprinter
 
 printProof :: MMProof -> IO ()
@@ -49,6 +51,39 @@ prettyCompressed (CompressedProof name fact fHyps djVars labels rpnStack _) =
       prettyLabels = lparen <+> fillSep (map pretty labels) <+> rparen
    in prettyProof name fact fHyps djVars (prettyLabels <+> prettyStack)
 
+prettyDefinition :: Label -> SymbolType -> T.Text -> Definition -> Doc a
+prettyDefinition label symbolType definedTerm definition =
+  vsep [prettySyntax, prettyDef]
+  where
+    prettySyntax = vsep [cStmt, synStmt]
+    prettyDef =
+      frame $
+        vsep $
+          prettyVars label localVars
+            ++ [sep $ map prettyCompoundDVR compounds | not $ null dvrs]
+            ++ [defStmt]
+    cStmt = "$c" <+> pretty definedTerm <+> "$."
+    synStmt = case symbolType of
+      SymPredicate _ ->
+        let RpnStep _ synLabel = prdStep definedTerm
+         in pretty synLabel <+> "$a prd" <+> pretty definedTerm <+> "$."
+      SymFunction _ ->
+        let RpnStep _ synLabel = funcStep label
+         in pretty synLabel <+> "$a func" <+> pretty definedTerm <+> "$."
+      SymConstant ->
+        let RpnStep _ synLabel = constStep label
+         in pretty synLabel <+> "$a trm" <+> pretty definedTerm <+> "$."
+    defStmt =
+      pretty label
+        <+> "$a ;"
+        <+> prettyWff definiendum
+        <+> ":="
+        <+> prettyWff definiens
+        <+> "$."
+    localVars = fHyps \\ preDeclaredVars
+    compounds = compoundDVRs fHyps dvrs
+    Definition definiendum definiens fHyps dvrs = definition
+
 prettyProof :: Label -> Fact -> [FHyp] -> [DVR] -> Doc a -> Doc a
 prettyProof name fact fHyps dvrs prettyStack =
   frame $
@@ -58,22 +93,24 @@ prettyProof name fact fHyps dvrs prettyStack =
         ++ zipWith prettyEHyp (map pad eLabels) eHyps
         ++ [prettyPStmt (pad name) claim prettyStack]
   where
-    (Fact claim _ eHyps _) = fact
+    (Fact claim eHyps _ _) = fact
     eLabels = map (number name) [1 .. length eHyps]
     labelLen = maximum $ map T.length (name : eLabels)
     pad = T.justifyLeft labelLen ' '
     localVars = fHyps \\ preDeclaredVars
     compounds = compoundDVRs fHyps dvrs
-    frame doc = nest 2 (vsep ["${", doc]) <> line <> "$}"
+
+frame :: Doc a -> Doc a
+frame doc = nest 2 (vsep ["${", doc]) <> line <> "$}"
 
 number :: T.Text -> Int -> T.Text
 number text n = text <> "." <> T.pack (show n)
 
 prettyVars :: T.Text -> [FHyp] -> [Doc a]
 prettyVars _ [] = []
-prettyVars thmLabel vars =
+prettyVars itemLabel vars =
   ("$v" <+> align (fillSep $ map (pretty . fHypName) vars) <+> "$.")
-    : map (prettyFHyp (thmLabel <> ".")) vars
+    : map (prettyFHyp (itemLabel <> ".")) vars
 
 prettyFHyp :: T.Text -> FHyp -> Doc a
 prettyFHyp prefix (WffHyp n) = pretty prefix <> "wff." <> pretty n <+> "$f wff" <+> pretty n <+> "$."

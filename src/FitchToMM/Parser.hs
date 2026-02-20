@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module FitchToMM.Parser
@@ -6,37 +7,26 @@ module FitchToMM.Parser
     BinOp (..),
     Quantifier (..),
     Term (..),
+    Arity,
+    SymbolType (..),
     parseFormula,
     unsafeParseFormula,
-    primitives,
+    union,
   )
 where
 
+import qualified Control.Applicative as A
 import Control.Monad
 import Data.Char
-import qualified Data.Map.Strict as M
-import qualified Data.Set as S
 import qualified Data.Text as T
 import Text.Parsec
 import Text.Parsec.Text
 
-data Language = Language PredicateNames FunctionNames ConstantNames
+type Arity = Int
 
-type PredicateNames = M.Map T.Text Int
+data SymbolType = SymPredicate Arity | SymFunction Arity | SymConstant
 
-type FunctionNames = M.Map T.Text Int
-
-type ConstantNames = S.Set T.Text
-
-instance Semigroup Language where
-  (Language p1 f1 c1) <> (Language p2 f2 c2) =
-    Language
-      (p1 <> p2)
-      (f1 <> f2)
-      (c1 <> c2)
-
-instance Monoid Language where
-  mempty = Language M.empty M.empty S.empty
+newtype Language = Language (T.Text -> Maybe SymbolType)
 
 data Wff
   = WffBinOp BinOp Wff Wff
@@ -71,14 +61,19 @@ unsafeParseFormula l form = case parseFormula l form of
   (Right wff) -> wff
 
 primitives :: Language
-primitives =
-  Language
-    (M.fromList [("eq", 2), ("in", 2)])
-    M.empty
-    S.empty
+primitives = Language $ \case
+  "eq" -> Just $ SymPredicate 2
+  "in" -> Just $ SymPredicate 2
+  _ -> Nothing
+
+union :: Language -> Language -> Language
+union (Language sig1) (Language sig2) =
+  let signature symbol = sig1 symbol A.<|> sig2 symbol
+   in Language signature
 
 parseWff :: Language -> Parser Wff
-parseWff l = strip $ do
+parseWff lang = strip $ do
+  let l = union primitives lang
   WffTrue <$ word "true"
     <|> WffFalse <$ word "false"
     <|> try parseMetavariable
@@ -114,11 +109,10 @@ parseQuantifier l = parens $ do
   return $ WffQnt qnt var expr
 
 parsePredicate :: Language -> Parser Wff
-parsePredicate l@(Language predicates _ _) = parens $ do
+parsePredicate lang = parens $ do
   name <- T.pack <$> many1 asciiLetter
-  guard $ name `M.member` predicates
-  arity <- tryMaybe (predicates M.!? name) ("Unknown predicate: " <> name)
-  args <- count arity (parseTerm l)
+  arity <- tryMaybe (findPred lang name) ("Unknown predicate: " <> name)
+  args <- count arity (parseTerm lang)
   return $ WffAtom name args
 
 parseMetavariable :: Parser Wff
@@ -149,11 +143,10 @@ parseTermMetavar = do
   return $ TrmMetavar $ var <> subscript
 
 parseFunction :: Language -> Parser Term
-parseFunction l@(Language _ functions _) = parens $ do
+parseFunction lang = parens $ do
   name <- T.pack <$> many1 asciiLetter
-  guard $ name `M.member` functions
-  arity <- tryMaybe (functions M.!? name) ("Unknown function: " <> name)
-  args <- count arity (parseTerm l)
+  arity <- tryMaybe (findFunc lang name) ("Unknown function: " <> name)
+  args <- count arity (parseTerm lang)
   return $ TrmFunc name args
 
 parseVariable :: Parser Term
@@ -164,9 +157,9 @@ parseVariable = do
   return $ TrmVar $ T.cons varLetter subscript
 
 parseConstant :: Language -> Parser Term
-parseConstant (Language _ _ constants) = do
+parseConstant lang = do
   name <- T.pack <$> many1 asciiLetter
-  guard $ name `S.member` constants
+  guard $ existsConst lang name
   return $ TrmConst name
 
 parseSubscript :: Parser T.Text
@@ -192,3 +185,18 @@ strip = between spaces spaces
 
 tryMaybe :: Maybe a -> T.Text -> Parser a
 tryMaybe val msg = maybe (fail $ T.unpack msg) pure val
+
+findPred :: Language -> T.Text -> Maybe Arity
+findPred (Language signature) name
+  | Just (SymPredicate arity) <- signature name = Just arity
+  | otherwise = Nothing
+
+findFunc :: Language -> T.Text -> Maybe Arity
+findFunc (Language signature) name
+  | Just (SymFunction arity) <- signature name = Just arity
+  | otherwise = Nothing
+
+existsConst :: Language -> T.Text -> Bool
+existsConst (Language signature) name
+  | Just SymConstant <- signature name = True
+  | otherwise = False

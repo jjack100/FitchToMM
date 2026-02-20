@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Expectations
@@ -10,11 +11,10 @@ module Expectations
   )
 where
 
-import qualified Data.Map.Strict as M
 import Data.Maybe
-import qualified Data.Set as S
 import qualified Data.Text as T
 import FitchToMM.Compressed (compressProof, packProof)
+import FitchToMM.Declarations
 import FitchToMM.FitchProof
 import FitchToMM.MMProof
 import FitchToMM.Parser
@@ -28,29 +28,29 @@ import Prettyprinter.Render.Text
 import Test.Hspec
 
 shouldVerifyWff :: T.Text -> Wff -> Expectation
-shouldVerifyWff base = shouldBeRight . verifyWff base
+shouldVerifyWff baseTxt = shouldBeRight . verifyWff baseTxt
 
 shouldVerifyProof :: T.Text -> FitchProof -> Expectation
-shouldVerifyProof base theorem = shouldBeRight $ verifyProof base theorem
+shouldVerifyProof baseTxt theorem = shouldBeRight $ verifyProof baseTxt theorem
 
 shouldReportMistakes :: FitchProof -> [(Int, Mistake)] -> Expectation
 shouldReportMistakes theorem =
-  let MMProof _ _ _ _ _ mistakes = fromJust $ fromFitchProof (const Nothing) theorem
+  let MMProof _ _ _ _ _ mistakes = fromJust $ fromFitchProof base theorem
    in shouldMatchList mistakes
 
 shouldFail :: FitchProof -> Expectation
-shouldFail theorem = shouldSatisfy (fromFitchProof (const Nothing) theorem) isNothing
+shouldFail theorem = shouldSatisfy (fromFitchProof base theorem) isNothing
 
 shouldBeRight :: (Show a) => Either a b -> Expectation
 shouldBeRight (Left err) = expectationFailure $ show err
 shouldBeRight (Right _) = pure ()
 
 verifyProof :: T.Text -> FitchProof -> Either String ()
-verifyProof base theorem@(FitchProof name _ _ _) = do
-  let label = T.unpack $ "thm." <> name
+verifyProof baseTxt theorem@(FitchProof name _ _ _) = do
+  let label = T.unpack name
   -- Verify it in normal format
-  let mmProof = fromJust $ fromFitchProof (const Nothing) theorem
-  let metamath = pretty $ base <> sampleSyntaxMM
+  let mmProof = fromJust $ fromFitchProof base theorem
+  let metamath = pretty $ baseTxt <> sampleSyntaxMM
   let full = renderString $ layoutCompact $ vsep [metamath, prettyNormal mmProof]
   (_, db) <- mmParseFromString full
   mmVerifiesLabel db label
@@ -61,12 +61,12 @@ verifyProof base theorem@(FitchProof name _ _ _) = do
   mmVerifiesLabel dbC label
 
 verifyWff :: T.Text -> Wff -> Either String ()
-verifyWff base wff = do
+verifyWff baseTxt wff = do
   let label = "wff-proof"
   let sexpr = renderStrict $ layoutCompact $ prettyWff $ wff
   let (proof, _) = runProofWriter $ proveWff wff
   let metamath =
-        base
+        baseTxt
           <> sampleSyntaxMM
           <> " ${ "
           <> label
@@ -79,15 +79,17 @@ verifyWff base wff = do
   mmVerifiesLabel db (T.unpack label)
 
 sampleSyntax :: Language
-sampleSyntax =
-  primitives
-    <> Language
-      -- Predicate Symbols
-      (M.fromList [("P", 1), ("Q", 2), ("R", 3)])
-      -- Function Symbols
-      (M.fromList [("F", 1), ("G", 2), ("H", 3)])
-      -- Constant Symbols
-      (S.fromList ["C", "D", "E"])
+sampleSyntax = Language $ \case
+  "P" -> Just $ SymPredicate 1
+  "Q" -> Just $ SymPredicate 2
+  "R" -> Just $ SymPredicate 3
+  "F" -> Just $ SymFunction 1
+  "G" -> Just $ SymFunction 2
+  "H" -> Just $ SymFunction 3
+  "C" -> Just $ SymConstant
+  "D" -> Just $ SymConstant
+  "E" -> Just $ SymConstant
+  _ -> Nothing
 
 sampleSyntaxMM :: T.Text
 sampleSyntaxMM =

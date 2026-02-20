@@ -50,10 +50,9 @@ library
   import: warnings
   -- Modules exported by the library.
   exposed-modules:
-    FitchToMM.Axioms
+    FitchToMM.Collection
     FitchToMM.Compressed
-    FitchToMM.Definitions
-    FitchToMM.Fact
+    FitchToMM.Declarations
     FitchToMM.FitchProof
     FitchToMM.MMProof
     FitchToMM.Matcher
@@ -93,6 +92,7 @@ executable fitch2mm
   main-is: Main.hs
   -- Modules included in this executable, other than Main.
   other-modules:
+    Cli
     Display
     Paths_fitch_to_mm
 

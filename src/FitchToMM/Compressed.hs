@@ -15,7 +15,7 @@ import Data.Maybe (mapMaybe)
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Vector.Unboxed as V
-import FitchToMM.Fact (Fact (..))
+import FitchToMM.Declarations (Fact (..))
 import FitchToMM.MMProof (MMProof (..))
 import FitchToMM.ProofWriter
 
@@ -52,7 +52,7 @@ compressProof :: PackedProof -> CompressedProof
 compressProof (PackedProof thmLabel fact optFHyps dvrs stack mistakes) =
   CompressedProof thmLabel fact optFHyps dvrs otherLabels compressed mistakes
   where
-    (Fact _ mandFHyps mandEHyps _) = fact
+    (Fact _ mandEHyps mandFHyps _) = fact
     -- Get the mandatory hypotheses of the proof
     fLabels = map fHypLabel mandFHyps
     eLabels = map (\n -> thmLabel <> "." <> T.show n) [1 .. length mandEHyps]

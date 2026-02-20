@@ -474,7 +474,6 @@ $( -------- Uniqueness Quantification -------- $)
 
 $c unique $.
 qnt.unique $a qnt unique $.
-
 ${
   $d y phi $.
   $( Define the uniqueness quantifier $)

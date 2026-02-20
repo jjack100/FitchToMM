@@ -2,19 +2,15 @@
 
 module FitchToMM.MMProof (Fact (..), MMProof (..), fromFitchProof) where
 
-import Control.Applicative ((<|>))
 import Control.Monad
 import Control.Monad.Writer.Strict
 import Data.Foldable (asum)
 import Data.List
-import qualified Data.Map.Strict as M
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import FitchToMM.Axioms
-import FitchToMM.Definitions
-import FitchToMM.Fact
+import FitchToMM.Declarations
 import FitchToMM.FitchProof
 import FitchToMM.Matcher
 import FitchToMM.Parser
@@ -38,17 +34,17 @@ data MMProof
   }
   deriving (Show)
 
-fromFitchProof :: (T.Text -> Maybe Fact) -> FitchProof -> Maybe MMProof
-fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps) = do
+fromFitchProof :: DeclMap -> FitchProof -> Maybe MMProof
+fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = do
   -- Return nothing on empty proof
   guard $ not $ null fitchSteps
   return $
     MMProof
-      ("thm." <> prfName)
+      prfName
       ( Fact
           finalClaim
-          (sortVars $ S.elems mandFHyps)
           prems
+          (sortVars $ S.elems mandFHyps)
           (S.toList mandDVRs)
       )
       (sortVars $ S.elems allFHyps)
@@ -66,8 +62,10 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
       -- Include those disjoint variable restrictions implied by the omission of
       -- any declared allowed substitutions (in addition to those incurred along
       -- the course of the proof)
-      mapM_ (inferDVRsCond allowedSubs) prems
-      inferDVRs S.empty allowedSubs finalClaim
+      let premDvrs = concatMap (\x -> inferDVRs allowedSubs (S.elems $ varsInCond x)) prems
+          claimDvrs = inferDVRs allowedSubs (S.elems $ varsInWff finalClaim)
+      mapM_ applyDVR premDvrs
+      mapM_ applyDVR claimDvrs
       V.last table
     -- Get details relevant to just the fact (the non-extended frame)
     mandFHyps = foldMap varsInCond prems <> varsInWff finalClaim <> (S.singleton $ CtxHyp "...")
@@ -120,7 +118,7 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
        in if succeeded intrPrf then intrPrf else elimPrf
     -- Handle application of a referenced rule
     step i fs@(FlatStep ctx wff (Reference ref) citations _)
-      | Just (Fact claim fHyps eHyps dvr) <- lookupFact ref = do
+      | Just (Fact claim eHyps fHyps dvr) <- lookupFact ref = do
           -- Verify we are citing the correct number of lines for the fact we are referencing
           unless (length citations == length eHyps) (lift $ Left BadCiteCount)
           citedSteps <- lift $ mapM (lookupStep i ctx) citations
@@ -220,16 +218,16 @@ fromFitchProof lookupThm proof@(FitchProof prfName allowedSubs prems fitchSteps)
           let prf = table V.! line
               stp = flatProof V.! line
           -- On failure, run the proof writer to just emit a "?"
-          base <- if succeeded prf then prf else pure $ fst $ runProofWriter prf
-          proveThin ctx stp base
+          basePrf <- if succeeded prf then prf else pure $ fst $ runProofWriter prf
+          proveThin ctx stp basePrf
     lookupProof i _ cite@(Range _ to)
       | Just err <- checkAccessibility flatProof i cite = lift $ Left err
       | otherwise =
           let prf = table V.! to
            in if succeeded prf then prf else pure $ fst $ runProofWriter prf
 
-    lookupFact ref = (axioms M.!? ref) <|> (lookupThm ref)
-    lookupDef ref = (baseDefinitions M.!? ref)
+    lookupFact = findFact decls
+    lookupDef = findDefinition decls
 
 -- Apply disjoint variable conditions
 applyDVRs :: Substitution -> [DVR] -> PropWriter
@@ -368,13 +366,13 @@ proveFHyp _ hyp = proveMetavar $ markInternal hyp
 
 -- Tries to thin a step to match a given context
 proveThin :: Context -> FlatStep -> RpnStack -> ProofWriter
-proveThin toCtx (FlatStep fromCtx _ _ _ _) base
-  | fromCtx == toCtx = pure base
-proveThin (psi : ctx) stp@(FlatStep _ phi _ _ _) base = do
+proveThin toCtx (FlatStep fromCtx _ _ _ _) basePrf
+  | fromCtx == toCtx = pure basePrf
+proveThin (psi : ctx) stp@(FlatStep _ phi _ _ _) basePrf = do
   ctxPrf <- proveCtx ctx
   phiPrf <- proveWff phi
   psiPrf <- proveWff psi
-  prev <- proveThin ctx stp base
+  prev <- proveThin ctx stp basePrf
   thinPrf <- proveStep $ RpnStep 4 "axm.thin"
   return $ ctxPrf <> phiPrf <> psiPrf <> prev <> thinPrf
 proveThin _ _ _ = lift $ Left Inapplicable
@@ -391,48 +389,6 @@ verifyEHyp (FlatStep (assump : ctx) wff _ _ _) (Condition (Just sup) hyp) = do
   hypSub <- wff `matchTo` hyp
   mergeFold [ctxSub, supSub, hypSub]
 verifyEHyp _ _ = Nothing
-
--- Add any disjoint variable restrictions implied by the omission of declared
--- allowed substitutions. A variable should be disjoint from any variables
--- bound within its scope unless explicitly allowed.
-inferDVRs :: S.Set FHyp -> AllowedSubs -> Wff -> PropWriter
-inferDVRs bound allowed (WffBinOp _ lhs rhs) = do
-  inferDVRs bound allowed lhs
-  inferDVRs bound allowed rhs
-inferDVRs bound allowed (WffNot wff) = inferDVRs bound allowed wff
-inferDVRs _ _ (WffFalse) = pure ()
-inferDVRs _ _ (WffTrue) = pure ()
-inferDVRs bound allowed (WffMetavar var) =
-  let allowedSubs = S.fromList (VarHyp <$> allowed var)
-      disjoint = S.difference bound allowedSubs
-   in reqDisjointFor (WffHyp var) disjoint
-inferDVRs bound allowed (WffQnt _ var wff) =
-  inferDVRs (S.insert (VarHyp var) bound) allowed wff
-inferDVRs bound allowed (WffAtom _ args) =
-  mapM_ (inferDVRsTrm bound allowed) args
-inferDVRs bound allowed (WffSub trm var wff) = do
-  inferDVRsTrm bound allowed trm
-  -- Also treat variables subject to substitution as "bound" for our our
-  -- purposes here (within the scope of where the substitution occurs)
-  inferDVRs (S.insert (VarHyp var) bound) allowed wff
-
-inferDVRsTrm :: S.Set FHyp -> AllowedSubs -> Term -> PropWriter
-inferDVRsTrm bound allowed (TrmMetavar var) =
-  let allowedSubs = S.fromList (VarHyp <$> allowed var)
-      disjoint = S.difference bound allowedSubs
-   in reqDisjointFor (TrmHyp var) disjoint
-inferDVRsTrm bound _ (TrmVar var) =
-  reqDisjointFor (VarHyp var) (S.delete (VarHyp var) bound)
-inferDVRsTrm bound allowed (TrmFunc _ args) =
-  mapM_ (inferDVRsTrm bound allowed) args
-inferDVRsTrm _ _ (TrmConst _) = pure ()
-
-inferDVRsCond :: AllowedSubs -> Condition -> PropWriter
-inferDVRsCond allowed (Condition (Just sup) hyp) = do
-  inferDVRs S.empty allowed sup
-  inferDVRs S.empty allowed hyp
-inferDVRsCond allowed (Condition Nothing hyp) =
-  inferDVRs S.empty allowed hyp
 
 varsInCond :: Condition -> S.Set FHyp
 varsInCond (Condition (Just sup) hyp) = varsInWff sup <> varsInWff hyp

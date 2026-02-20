@@ -6,12 +6,14 @@ module Display
     withColor,
     withBold,
     withItalics,
+    prettyDef,
   )
 where
 
 import Control.Exception
 import Data.List
 import qualified Data.Text as T
+import FitchToMM.Declarations
 import FitchToMM.FitchProof
 import FitchToMM.Parser
 import FitchToMM.Pretty
@@ -113,6 +115,16 @@ prettyFitch asSExpr (FitchProof name allowedSubs prems steps) =
     printCites = T.intercalate ", " . map printCite
     printCite (Line n) = T.show n
     printCite (Range from to) = T.show from <> "–" <> T.show to
+    render = if asSExpr then wffToText else prettierWff allowedSubs
+
+prettyDef :: Bool -> T.Text -> AllowedSubs -> Definition -> T.Text
+prettyDef asSExpr label allowedSubs (Definition definiendum definiens _ _) =
+  label
+    <> ":\n\n"
+    <> render definiendum
+    <> " := "
+    <> render definiens
+  where
     render = if asSExpr then wffToText else prettierWff allowedSubs
 
 padL :: [T.Text] -> [T.Text]

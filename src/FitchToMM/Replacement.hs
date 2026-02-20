@@ -11,7 +11,7 @@ import Control.Monad (guard, zipWithM)
 import qualified Control.Monad.Writer.Strict as W
 import Data.Monoid (First (..))
 import qualified Data.Text as T
-import FitchToMM.FitchProof (AllowedSubs)
+import FitchToMM.Declarations (AllowedSubs)
 import FitchToMM.Matcher (varsInLst, varsInTrm, varsInWff)
 import FitchToMM.Parser
 import FitchToMM.ProofWriter

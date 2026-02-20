@@ -9,6 +9,7 @@ import FitchToMM.FitchProof
 import FitchToMM.ProofWriter
 import Paths_fitch_to_mm
 import Test.Hspec
+import FitchToMM.Declarations
 
 spec :: Spec
 spec = describe "FitchProver" $ do
