@@ -34,6 +34,10 @@ module FitchToMM.ProofWriter
     applyDVR,
     preDeclaredVars,
     sortVars,
+    proveMMStep,
+    isSetvar,
+    isMetavar,
+    isCtx,
   )
 where
 
@@ -116,6 +120,19 @@ fHypLabel (WffHyp l) = "wff." <> l
 fHypLabel (CtxHyp "...") = "ctx.ellipsis"
 fHypLabel (CtxHyp l) = "ctx." <> l
 
+isSetvar :: FHyp -> Bool
+isSetvar (VarHyp _) = True
+isSetvar _ = False
+
+isMetavar :: FHyp -> Bool
+isMetavar (WffHyp _) = True
+isMetavar (TrmHyp _) = True
+isMetavar _ = False
+
+isCtx :: FHyp -> Bool
+isCtx (CtxHyp _) = True
+isCtx _ = False
+
 {- Prefix a variable with an underscore to indicate it is used internally
    (i.e., used in the generated proof but not present in the Fitch proof) -}
 markInternal :: FHyp -> FHyp
@@ -139,6 +156,11 @@ proveEllipsis = proveMetavar $ CtxHyp "..."
 proveStep :: RpnStep -> ProofWriter
 proveStep = pure . RpnStack . D.singleton . (StackEntry False)
 
+proveMMStep :: Label -> [RpnStack] -> ProofWriter
+proveMMStep label hyps = do
+  step <- proveStep $ RpnStep (length hyps) label
+  return $ mconcat hyps <> step
+
 proveLocalStep :: RpnStep -> ProofWriter
 proveLocalStep = pure . RpnStack . D.singleton . (StackEntry True)
 
@@ -146,10 +168,14 @@ mkDVR :: FHyp -> FHyp -> DVR
 mkDVR v1 v2 = if v1 <= v2 then DVR v1 v2 else DVR v2 v1
 
 applyDVR :: DVR -> W.WriterT ProofProps (Either Mistake) ()
-applyDVR dvr = W.tell $ ProofProps S.empty (S.singleton dvr)
+applyDVR dvr@(DVR v1 v2)
+  | v1 /= v2 = W.tell $ ProofProps S.empty (S.singleton dvr)
+  | otherwise = pure ()
 
-reqDisjoint :: FHyp -> FHyp -> W.WriterT ProofProps (Either Mistake) ()
-reqDisjoint v1 v2 = W.tell $ ProofProps S.empty (S.singleton $ mkDVR v1 v2)
+reqDisjoint :: FHyp -> FHyp -> PropWriter
+reqDisjoint v1 v2
+  | v1 /= v2 = W.tell $ ProofProps S.empty (S.singleton $ mkDVR v1 v2)
+  | otherwise = pure ()
 
 reqDisjointFor :: (Foldable t) => FHyp -> t FHyp -> PropWriter
 reqDisjointFor v = mapM_ (reqDisjoint v)
@@ -192,7 +218,7 @@ preDeclaredVars =
   [CtxHyp "..."]
     ++ map WffHyp ["phi", "psi", "chi", "phi_1", "psi_1", "chi_1", "phi_2", "psi_2", "chi_2"]
     ++ map (VarHyp . T.singleton) ['a' .. 'z']
-    ++ map TrmHyp ["trm_1", "trm_2", "trm_3"]
+    ++ map TrmHyp ["trm_1", "trm_2", "trm_3", "trm_4", "trm_5"]
     ++ [VarHyp "_a", VarHyp "_x", VarHyp "_trm_1"]
 
 sortVars :: [FHyp] -> [FHyp]

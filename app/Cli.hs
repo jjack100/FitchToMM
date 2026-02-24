@@ -23,7 +23,7 @@ data Commands
       }
   | ShowOptions
       { cmdInputFile :: FilePath,
-        cmdItemName :: T.Text,
+        cmdItemLabel :: T.Text,
         cmdStyle :: DisplayStyle,
         cmdSExpr :: Bool
       }
@@ -73,10 +73,10 @@ showParser =
   ShowOptions
     <$> strArgument (metavar "INPUT_FILE")
     <*> strOption
-      ( long "name"
-          <> short 'n'
-          <> metavar "ITEM_NAME"
-          <> help "Name of the item to display"
+      ( long "label"
+          <> short 'l'
+          <> metavar "ITEM_LABEL"
+          <> help "Label of the item to display"
       )
     <*> styleParser
     <*> switch (long "sexpr" <> help "Display formulae as raw S-Expressions (as they appear in the Metamath database)")

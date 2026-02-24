@@ -1,15 +1,14 @@
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module MMProofSpec (spec) where
 
 import qualified Data.Text.IO as TIO
 import Expectations
+import FitchToMM.Declarations
 import FitchToMM.FitchProof
 import FitchToMM.ProofWriter
 import Paths_fitch_to_mm
 import Test.Hspec
-import FitchToMM.Declarations
 
 spec :: Spec
 spec = describe "FitchProver" $ do
@@ -17,6 +16,8 @@ spec = describe "FitchProver" $ do
   folMM <- runIO $ TIO.readFile folPath
 
   let noneFree = const []
+      xInPhi "phi" = ["x"]
+      xInPhi _ = []
 
   describe "Propositional Logic" $ do
     it "correctly handles a simple subproof" $ do
@@ -346,44 +347,90 @@ spec = describe "FitchProver" $ do
               [FitchStep (expr "( R C D E )") "axm.eq-elim" [Line 1, Line 2]]
       shouldVerifyProof folMM theorem2
 
-    it "can use universal quantification with implication" $ do
+  describe "Proper Substitution" $ do
+    it "allows universal generalization to introduce substitution for WFFs" $ do
+      let theorem1 =
+            FitchProof
+              "sub-intr-example-1"
+              noneFree
+              []
+              [ FitchStep (expr "( eq a a )") "axm.eq-intr" [],
+                FitchStep (expr "( forall x ( sub x a ( eq a a ) ) )") "axm.forall-intr" [Line 1]
+              ]
+      let theorem2 =
+            FitchProof
+              "sub-intr-example-2"
+              noneFree
+              [Condition Nothing (expr "false")]
+              [FitchStep (expr "( forall x ( sub x a false ) )") "axm.forall-intr" [Line 1]]
+      shouldVerifyProof folMM theorem1
+      shouldVerifyProof folMM theorem2
+
+    it "allows universal generalization to eliminate substitution for WFFs" $ do
       let theorem =
             FitchProof
-              "forall-implies-example"
-              ( \case
-                  "chi" -> ["x"]
-                  _ -> []
-              )
-              [ Condition Nothing (expr "(forall x ( implies phi psi ))"),
-                Condition Nothing (expr "(implies psi chi)")
-              ]
-              [ FitchStep (expr "(implies phi psi)") "axm.forall-elim" [Line 1],
-                FitchSubproof
-                  (expr "phi")
-                  [ FitchStep (expr "psi") "axm.implies-elim" [Line 3, Line 4],
-                    FitchStep (expr "chi") "axm.implies-elim" [Line 2, Line 5]
-                  ],
-                FitchStep (expr "(implies phi chi)") "axm.implies-intr" [Range 4 6],
-                FitchStep (expr "(forall x (implies phi chi))") "axm.forall-intr" [Line 7]
+              "sub-elim-example-1"
+              xInPhi
+              [Condition Nothing (expr "( sub a x phi )")]
+              [FitchStep (expr "( forall x phi )") "axm.forall-intr" [Line 1]]
+      shouldVerifyProof folMM theorem
+
+    it "allows universal generalization to introduce substitution for terms" $ do
+      let theorem =
+            FitchProof
+              "sub-intr-example-1"
+              noneFree
+              []
+              [ FitchStep (expr "( eq a a )") "axm.eq-intr" [],
+                FitchStep (expr "( forall x ( eq ( sub x a a ) ( sub x a a ) ) )") "axm.forall-intr" [Line 1]
               ]
       shouldVerifyProof folMM theorem
 
-    it "can introduce substitution by definition" $ do
+    it "allows universal generalization to eliminate substitution for terms" $ do
       let theorem =
             FitchProof
-              "sub-intr-example"
+              "sub-elim-example-1"
+              xInPhi
+              [Condition Nothing (expr "( P ( sub a x x ) )")]
+              [FitchStep (expr "( forall x ( P x ) )") "axm.forall-intr" [Line 1]]
+      shouldVerifyProof folMM theorem
+
+    it "can introduce substitution for WFFs by definition" $ do
+      let theorem =
+            FitchProof
+              "sub-def-intr-example"
               noneFree
               [Condition Nothing (expr "( eq a a )")]
-              [FitchStep (expr "( sub a b ( eq b b ) )") "def.sub" [Line 1]]
+              [FitchStep (expr "( sub a b ( eq b b ) )") "def.sub-wff" [Line 1]]
       shouldVerifyProof folMM theorem
 
-    it "can eliminate substitution by definition" $ do
+    it "can eliminate substitution for WFFs by definition" $ do
       let theorem =
             FitchProof
-              "sub-elim-example"
+              "sub-def-elim-example"
               noneFree
               [Condition Nothing (expr "( sub a b ( eq b b ) )")]
-              [FitchStep (expr "( eq a a )") "def.sub" [Line 1]]
+              [FitchStep (expr "( eq a a )") "def.sub-wff" [Line 1]]
+      shouldVerifyProof folMM theorem
+
+    it "can introduce substitution for terms by definition" $ do
+      let theorem =
+            FitchProof
+              "sub-def-intr-example"
+              noneFree
+              [Condition Nothing (expr "( eq a ( F b ) )")]
+              [FitchStep (expr "( eq a ( sub b c ( F c ) ) )") "def.sub-trm" [Line 1]]
+      shouldReportMistakes theorem []
+      shouldVerifyProof folMM theorem
+
+    it "can eliminate substitution for terms by definition" $ do
+      let theorem =
+            FitchProof
+              "sub-def-elim-example"
+              noneFree
+              [Condition Nothing (expr "( eq a ( sub b c ( F c ) ) )")]
+              [FitchStep (expr "( eq a ( F b ) )") "def.sub-trm" [Line 1]]
+      shouldReportMistakes theorem []
       shouldVerifyProof folMM theorem
 
   describe "Validation of citations" $ do

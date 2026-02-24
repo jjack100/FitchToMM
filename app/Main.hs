@@ -113,11 +113,11 @@ printMistakes thm mistakes = withColor stderr Dull Yellow $ do
 makeHeading :: T.Text -> T.Text
 makeHeading text =
   "$(\n"
-    <> T.replicate 80 "-"
+    <> T.replicate 80 "#"
     <> "\n"
     <> text
     <> "\n"
-    <> T.replicate 80 "-"
+    <> T.replicate 80 "#"
     <> "\n"
     <> "$)"
 

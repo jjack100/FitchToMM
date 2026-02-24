@@ -13,6 +13,7 @@ import qualified Data.Vector as V
 import FitchToMM.Declarations
 import FitchToMM.FitchProof
 import FitchToMM.Matcher
+import FitchToMM.Nonfree
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.Replacement
@@ -112,9 +113,13 @@ fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = d
     step i fs@(FlatStep _ _ (Reference "axm.iff-elim") _ _) = choice i fs ["axm.iff-elim-1", "axm.iff-elim-2"]
     step i fs@(FlatStep _ _ (Reference "axm.eq-elim") _ _) = choice i fs ["axm.eq-elim-1", "thm.eq-elim-2"]
     -- Handle references to the definition of substitution
-    step i fs@(FlatStep _ _ (Reference "def.sub") _ _) =
-      let intrPrf = proveDefI (proveDefSub allowedSubs) i fs
-          elimPrf = proveDefE (proveDefSub allowedSubs) i fs
+    step i fs@(FlatStep _ _ (Reference "def.sub-wff") _ _) =
+      let intrPrf = proveDefI (proveDefSubWff allowedSubs) i fs
+          elimPrf = proveDefE (proveDefSubWff allowedSubs) i fs
+       in if succeeded intrPrf then intrPrf else elimPrf
+    step i fs@(FlatStep _ _ (Reference "def.sub-trm") _ _) =
+      let intrPrf = proveDefI (proveDefSubTrm allowedSubs) i fs
+          elimPrf = proveDefE (proveDefSubTrm allowedSubs) i fs
        in if succeeded intrPrf then intrPrf else elimPrf
     -- Handle application of a referenced rule
     step i fs@(FlatStep ctx wff (Reference ref) citations _)
@@ -136,18 +141,12 @@ fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = d
                 "axm.eq-elim-1" -> proveEqE allowedSubs merged
                 "thm.eq-elim-2" -> proveEqE allowedSubs merged
                 _ -> Just (merged, [])
-          (fullSub, replacements) <- try result Inapplicable
+          (fullSub, extraHyps) <- try result Inapplicable
           applyDVRs fullSub dvr
           fHypPrfs <- mapM (proveFHyp fullSub) fHyps
-          replPrfs <- sequence replacements
+          extraPrfs <- sequence extraHyps
           eHypPrfs <- mapM (lookupProof i ctx) citations
-          let numMandHyps = length fHyps + length eHyps + length replacements
-          labelProof <- proveStep $ RpnStep numMandHyps ref
-          return $
-            mconcat fHypPrfs
-              <> mconcat replPrfs
-              <> mconcat eHypPrfs
-              <> labelProof
+          proveMMStep ref (concat [fHypPrfs, extraPrfs, eHypPrfs])
       | Just (Definition definiendum definiens fHyps dvr) <- lookupDef ref =
           let proveDef fromDefiniendum fromDefiniens = do
                 sub1 <- try (fromDefiniendum `matchTo` definiendum) Inapplicable
@@ -276,15 +275,20 @@ proveForallI allowed sub = do
   phi <- lookupWff "phi" sub
   psi <- lookupWff "psi" sub
   x <- lookupVar "x" sub
+  ctx <- lookupCtx "..." sub
   -- Solve for the substitution needed for 'a', also trying a dummy variable
   -- _a for the trivial case where x does not occur in ψ
-  let candidates = varsInWff phi <> (S.singleton $ VarHyp "_a")
+  let nfPrf2 = proveNfWff allowed x phi
+      candidates = varsInWff phi <> varsInWff psi <> (S.singleton $ VarHyp "_a")
       tryCandidate cand = do
+        guard $ isSetvar cand
         let candName = fHypName cand
-            replPrf = proveReplWff allowed psi candName phi (TrmVar x)
-        guard $ succeeded replPrf
+            nfPrf1 = proveNfCtx allowed candName ctx
+            rPrf = proveReplWff allowed psi candName phi (TrmVar x)
+        guard $ succeeded nfPrf1
+        guard $ succeeded rPrf
         fullSub <- merge sub $ singletonVar "a" candName
-        return $ (fullSub, [replPrf])
+        return $ (fullSub, [nfPrf1, nfPrf2, rPrf])
 
   asum $ map tryCandidate $ S.toList candidates
 
@@ -297,8 +301,8 @@ proveExistsI allowed sub = do
   -- Solve for the substitution needed for trm_1
   let trm_1 = fromMaybe (TrmMetavar "_trm_1") (solveForTrm allowed phi psi x)
   fullSub <- merge sub $ singletonTrm "trm_1" trm_1
-  let replPrf = proveReplWff allowed phi x psi trm_1
-  return (fullSub, [replPrf])
+  let rPrf = proveReplWff allowed phi x psi trm_1
+  return (fullSub, [rPrf])
 
 proveForallE :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveForallE allowed sub = do
@@ -309,22 +313,27 @@ proveForallE allowed sub = do
   -- Solve for the substitution needed for trm_1
   let trm_1 = fromMaybe (TrmMetavar "_trm_1") (solveForTrm allowed psi phi x)
   fullSub <- merge sub $ singletonTrm "trm_1" trm_1
-  let replPrf = proveReplWff allowed psi x phi trm_1
-  return (fullSub, [replPrf])
+  let rPrf = proveReplWff allowed psi x phi trm_1
+  return (fullSub, [rPrf])
 
 proveExistsE :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveExistsE allowed sub = do
-  -- We should already know the substitutions for φ,ψ,x
+  -- We should already know the substitutions for φ,ψ,χ,x
   phi <- lookupWff "phi" sub
   psi <- lookupWff "psi" sub
+  chi <- lookupWff "chi" sub
   x <- lookupVar "x" sub
+  ctx <- lookupCtx "..." sub
   -- Solve for the substitution needed for a
   let aTrm = fromMaybe (TrmVar "_a") (solveForTrm allowed psi phi x)
   -- a must be a variable
   a <- case aTrm of (TrmVar name) -> Just name; _ -> Nothing
   fullSub <- merge sub $ singletonVar "a" a
-  let replPrf = proveReplWff allowed psi x phi aTrm
-  return (fullSub, [replPrf])
+  let nfPrf1 = proveNfCtx allowed a ctx
+      nfPrf2 = proveNfWff allowed a phi
+      nfPrf3 = proveNfWff allowed a chi
+      rPrf = proveReplWff allowed psi x phi aTrm
+  return (fullSub, [nfPrf1, nfPrf2, nfPrf3, rPrf])
 
 proveEqE :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveEqE allowed sub = do
@@ -336,12 +345,12 @@ proveEqE allowed sub = do
   -- Solve for the substitution needed for χ
   chi <- solveForWff allowed phi psi trm_1 trm_2 "_x"
   fullSub <- mergeFold [sub, singletonWff "chi" chi, singletonVar "x" "_x"]
-  let replPrf1 = proveReplWff allowed phi "_x" chi trm_1
-  let replPrf2 = proveReplWff allowed psi "_x" chi trm_2
-  return (fullSub, [replPrf1, replPrf2])
+  let rPrf1 = proveReplWff allowed phi "_x" chi trm_1
+  let rPrf2 = proveReplWff allowed psi "_x" chi trm_2
+  return (fullSub, [rPrf1, rPrf2])
 
-proveDefSub :: AllowedSubs -> Wff -> Wff -> ProofWriter
-proveDefSub allowedSubs definiendum definiens = do
+proveDefSubWff :: AllowedSubs -> Wff -> Wff -> ProofWriter
+proveDefSubWff allowedSubs definiendum definiens = do
   sub1 <- try (definiendum `matchTo` WffSub (TrmMetavar "trm_1") "x" (WffMetavar "phi")) Inapplicable
   sub2 <- try (merge sub1 (singletonWff "psi" definiens)) Inapplicable
   -- Get the proofs for the floating hypotheses
@@ -354,8 +363,24 @@ proveDefSub allowedSubs definiendum definiens = do
   trm_1 <- try (lookupTrm "trm_1" sub2) Inapplicable
   replPrf <- proveReplWff allowedSubs psi x phi trm_1
   -- Prove the definition statement
-  labelProof <- proveStep $ RpnStep 5 "def.sub"
-  return $ mconcat fHypPrfs <> replPrf <> labelProof
+  proveMMStep "def.sub-wff" (fHypPrfs ++ [replPrf])
+
+proveDefSubTrm :: AllowedSubs -> Wff -> Wff -> ProofWriter
+proveDefSubTrm allowedSubs definiendum definiens = do
+  sub1 <- try (definiendum `matchTo` (WffAtom "eq" [TrmMetavar "trm_1", TrmSub (TrmMetavar "trm_4") "x" (TrmMetavar "trm_3")])) Inapplicable
+  sub2 <- try (definiens `matchTo` (WffAtom "eq" [TrmMetavar "trm_1", TrmMetavar "trm_2"])) Inapplicable
+  subMerged <- try (merge sub1 sub2) Inapplicable
+  -- Get the proofs for the floating hypotheses
+  let fHyps = [VarHyp "x", TrmHyp "trm_1", TrmHyp "trm_2", TrmHyp "trm_3", TrmHyp "trm_4"]
+  fHypPrfs <- mapM (proveFHyp subMerged) fHyps
+  -- Get the proof for the replacement statement
+  t2 <- try (lookupTrm "trm_2" subMerged) Inapplicable
+  t3 <- try (lookupTrm "trm_3" subMerged) Inapplicable
+  t4 <- try (lookupTrm "trm_4" subMerged) Inapplicable
+  x <- try (lookupVar "x" subMerged) Inapplicable
+  replPrf <- proveReplTrm allowedSubs t2 x t3 t4
+  -- Prove the definition statement
+  proveMMStep "def.sub-trm" (fHypPrfs ++ [replPrf])
 
 proveFHyp :: Substitution -> FHyp -> ProofWriter
 proveFHyp sub (WffHyp hyp) | Just wff <- lookupWff hyp sub = proveWff wff

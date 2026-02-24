@@ -170,6 +170,7 @@ prettyTrm (TrmVar var) = pretty var
 prettyTrm (TrmFunc f args) = prettySExpr $ pretty f : map prettyTrm args
 prettyTrm (TrmConst c) = pretty c
 prettyTrm (TrmMetavar m) = pretty m
+prettyTrm (TrmSub t1 v t2) = prettySExpr ["sub", prettyTrm t1, pretty v, prettyTrm t2]
 
 prettyOp :: BinOp -> Doc a
 prettyOp OpAnd = "and"
@@ -181,7 +182,6 @@ prettyQnt :: Quantifier -> Doc a
 prettyQnt QntForall = "forall"
 prettyQnt QntExists = "exists"
 prettyQnt QntUnique = "unique"
-prettyQnt QntFor = "for"
 
 prettySExpr :: [Doc a] -> Doc a
 prettySExpr items = lparen <+> align (sep items) <+> rparen

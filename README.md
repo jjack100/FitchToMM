@@ -55,13 +55,13 @@ If any mistakes are encountered, it will emit warnings but still try to generate
 ### Displaying proofs
 The `show` subcommand can be used to display a specific proof:
 ```
-Usage: fitch2mm show INPUT_FILE (-n|--name ITEM_NAME) 
+Usage: fitch2mm show INPUT_FILE (-l|--label ITEM_LABEL) 
                      [(-f|--fitch) | (-s|--sequent)] [--sexpr]
 
   Display a specific theorem
 
 Available options:
-  -n,--name ITEM_NAME      Name of the item to display
+  -l,--label ITEM_LABEL    Label of the item to display
   -f,--fitch               Show proof in Fitch-style (default)
   -s,--sequent             Show proof in sequent style
   --sexpr                  Display formulae as raw S-Expressions (as they appear

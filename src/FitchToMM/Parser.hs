@@ -42,7 +42,7 @@ data Wff
 data BinOp = OpAnd | OpOr | OpImplies | OpIff
   deriving (Show, Eq, Ord)
 
-data Quantifier = QntForall | QntExists | QntUnique | QntFor
+data Quantifier = QntForall | QntExists | QntUnique
   deriving (Show, Eq, Ord)
 
 data Term
@@ -50,6 +50,7 @@ data Term
   | TrmVar T.Text
   | TrmConst T.Text
   | TrmMetavar T.Text
+  | TrmSub Term T.Text Term
   deriving (Show, Eq, Ord)
 
 parseFormula :: Language -> T.Text -> Either ParseError Wff
@@ -80,7 +81,7 @@ parseWff lang = strip $ do
     <|> try (parseBinaryOp l)
     <|> try (parseUnaryOp l)
     <|> try (parseQuantifier l)
-    <|> try (parseSub l)
+    <|> try (parseSubWff l)
     <|> parsePredicate l
 
 parseBinaryOp :: Language -> Parser Wff
@@ -121,8 +122,8 @@ parseMetavariable = do
   subscript <- option "" parseSubscript
   return $ WffMetavar $ var <> subscript
 
-parseSub :: Language -> Parser Wff
-parseSub l = parens $ do
+parseSubWff :: Language -> Parser Wff
+parseSubWff l = parens $ do
   _ <- word "sub"
   trm <- parseTerm l
   TrmVar var <- parseVariable
@@ -134,7 +135,8 @@ parseTerm l = strip $ do
   try parseTermMetavar
     <|> try (parseFunction l)
     <|> try parseVariable
-    <|> parseConstant l
+    <|> try (parseConstant l)
+    <|> parseSubTrm l
 
 parseTermMetavar :: Parser Term
 parseTermMetavar = do
@@ -161,6 +163,14 @@ parseConstant lang = do
   name <- T.pack <$> many1 asciiLetter
   guard $ existsConst lang name
   return $ TrmConst name
+
+parseSubTrm :: Language -> Parser Term
+parseSubTrm l = parens $ do
+  _ <- word "sub"
+  trm1 <- parseTerm l
+  TrmVar var <- parseVariable
+  trm2 <- parseTerm l
+  return $ TrmSub trm1 var trm2
 
 parseSubscript :: Parser T.Text
 parseSubscript = do

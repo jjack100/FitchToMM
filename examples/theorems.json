@@ -399,6 +399,38 @@
           ]
         }
       ]
+    },
+    {
+      "tag": "Theorem",
+      "label": "thm.neq-cq",
+      "allowedSubs": { "trm_1": ["x"] },
+      "premises": [{ "condition": "( forall x ( neq x trm_1 ) )" }],
+      "steps": [
+        {
+          "tag": "ProofStep",
+          "expression": "( neq a ( sub a x trm_1 ) )",
+          "rule": "axm.forall-elim",
+          "cites": [{ "tag": "Line", "contents": 1 }]
+        },
+        {
+          "tag": "ProofStep",
+          "expression": "( not ( eq a ( sub a x trm_1 ) ) )",
+          "rule": "def.neq",
+          "cites": [{ "tag": "Line", "contents": 2 }]
+        },
+        {
+          "tag": "ProofStep",
+          "expression": "( forall x ( not ( eq x trm_1 ) ) )",
+          "rule": "axm.forall-intr",
+          "cites": [{ "tag": "Line", "contents": 3 }]
+        },
+        {
+          "tag": "ProofStep",
+          "expression": "( not ( exists x ( eq x trm_1 ) ) )",
+          "rule": "thm.cq-1",
+          "cites": [{ "tag": "Line", "contents": 4 }]
+        }
+      ]
     }
   ]
 }

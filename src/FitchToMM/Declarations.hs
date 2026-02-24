@@ -112,13 +112,9 @@ inferDVRs allowed fhyps = nubOrd $ do
   var2 <- fhyps
   guard $ var1 /= var2
   -- Only consider DVRs where at least one (the first) is a setvar
-  let isSetvar (VarHyp _) = True
-      isSetvar _ = False
   guard $ isSetvar var1
   -- Don't automatically include DVRs with the assumption context
   -- That is only necessary in special cases to express side-conditions
-  let isCtx (CtxHyp _) = True
-      isCtx _ = False
   guard $ not $ isCtx var2
   -- Don't include DVRs when the substitution is explicitly allowed
   guard $ not $ (fHypName var1) `elem` allowed (fHypName var2)
@@ -270,7 +266,7 @@ base =
           "( forall x psi )"
           [(Nothing, "phi")]
           [CtxHyp "...", WffHyp "phi", WffHyp "psi", VarHyp "a", VarHyp "x"]
-          [mkDVR (CtxHyp "...") (VarHyp "a")]
+          []
       ),
       ( "axm.exists-intr",
         declareFact
@@ -300,7 +296,7 @@ base =
             (Just "psi", "chi")
           ]
           [CtxHyp "...", WffHyp "phi", WffHyp "psi", WffHyp "chi", VarHyp "a", VarHyp "x"]
-          [mkDVR (CtxHyp "...") (VarHyp "a"), mkDVR (WffHyp "phi") (VarHyp "a"), mkDVR (WffHyp "chi") (VarHyp "a")]
+          []
       ),
       ( "axm.eq-elim-1",
         declareFact

@@ -16,6 +16,7 @@ module FitchToMM.Matcher
     varsInWff,
     varsInTrm,
     varsInLst,
+    varsInCtx,
     checkDisjoints,
     mergeFold,
   )
@@ -64,7 +65,7 @@ matchTo _ _ = Nothing
 matchToTrm :: Term -> Term -> Maybe Substitution
 -- Any term may match to a term metavariable
 matchToTrm trm (TrmMetavar metavar) = Just $ singletonTrm metavar trm
--- Any variable may match to a variable (alpha conversion)
+-- Any variable may match to a variable
 matchToTrm (TrmVar v) (TrmVar v') = Just $ singletonVar v' v
 -- Constant symbols must match exactly
 matchToTrm (TrmConst c) (TrmConst c') | c == c' = Just empty
@@ -72,6 +73,11 @@ matchToTrm (TrmConst c) (TrmConst c') | c == c' = Just empty
 matchToTrm (TrmFunc f args) (TrmFunc f' args') | f == f' = do
   argSubs <- zipWithM matchToTrm args args'
   mergeFold argSubs
+matchToTrm (TrmSub t1 v t2) (TrmSub t1' v' t2') = do
+  t1Sub <- matchToTrm t1 t1'
+  let varSub = singletonVar v' v
+  t2Sub <- matchToTrm t2 t2'
+  mergeFold [t1Sub, varSub, t2Sub]
 -- Otherwise the match fails
 matchToTrm _ _ = Nothing
 
@@ -136,7 +142,10 @@ varsIn :: Expression -> S.Set FHyp
 varsIn (ExprWff wff) = varsInWff wff
 varsIn (ExprTrm trm) = varsInTrm trm
 varsIn (ExprVar var) = S.singleton $ VarHyp var
-varsIn (ExprCtx ctx) = S.insert (CtxHyp "...") (foldMap' varsInWff ctx)
+varsIn (ExprCtx ctx) = varsInCtx ctx
+
+varsInCtx :: [Wff] -> S.Set FHyp
+varsInCtx ctx = S.insert (CtxHyp "...") (foldMap' varsInWff ctx)
 
 varsInWff :: Wff -> S.Set FHyp
 varsInWff (WffBinOp _ lhs rhs) = varsInWff lhs <> varsInWff rhs
@@ -153,7 +162,8 @@ varsInLst :: [Term] -> S.Set FHyp
 varsInLst = foldMap' varsInTrm
 
 varsInTrm :: Term -> S.Set FHyp
-varsInTrm (TrmVar v) = S.singleton $ VarHyp v
+varsInTrm (TrmVar x) = S.singleton $ VarHyp x
 varsInTrm (TrmFunc _ args) = varsInLst args
 varsInTrm (TrmConst _) = S.empty
-varsInTrm (TrmMetavar v) = S.singleton $ TrmHyp v
+varsInTrm (TrmMetavar var) = S.singleton $ TrmHyp var
+varsInTrm (TrmSub t1 x t2) = (varsInTrm t1) <> (S.singleton $ VarHyp x) <> (varsInTrm t2)

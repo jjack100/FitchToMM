@@ -151,17 +151,15 @@ prettierWff a (WffQnt QntExists var wff) =
   "∃" <> var <> prettierWff a wff
 prettierWff a (WffQnt QntUnique var wff) =
   "∃!" <> var <> prettierWff a wff
-prettierWff a (WffQnt QntFor var wff) =
-  "FOR" <> var <> prettierWff a wff
 prettierWff a (WffSub trm var wff) =
   let wffTxt = case wff of
-        -- Add parens around prefix operators to prevent possible ambiguity
+        -- Add parens around prefix operators to help make syntax clear
         (WffNot _) -> "(" <> prettierWff a wff <> ")"
         (WffQnt _ _ _) -> "(" <> prettierWff a wff <> ")"
         _ -> prettierWff a wff
    in wffTxt <> "[" <> prettierTerm a trm <> "/" <> var <> "]"
 prettierWff a (WffAtom "eq" [lhs, rhs]) =
-  (prettierTerm a lhs) <> " = " <> (prettierTerm a rhs)
+  "(" <> (prettierTerm a lhs) <> " = " <> (prettierTerm a rhs) <> ")"
 prettierWff a (WffAtom label args) =
   label <> "(" <> T.intercalate ", " (map (prettierTerm a) args) <> ")"
 prettierWff a (WffMetavar label) = prettierVar a label
@@ -172,6 +170,8 @@ prettierTerm a (TrmMetavar label) = prettierVar a label
 prettierTerm _ (TrmConst label) = label
 prettierTerm a (TrmFunc label args) =
   label <> "(" <> T.intercalate ", " (map (prettierTerm a) args) <> ")"
+prettierTerm a (TrmSub trm1 var trm2) =
+  prettierTerm a trm2 <> "[" <> prettierTerm a trm1 <> "/" <> var <> "]"
 
 prettierVar :: AllowedSubs -> T.Text -> T.Text
 prettierVar a var = case groups of

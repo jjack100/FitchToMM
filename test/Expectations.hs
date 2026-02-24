@@ -1,17 +1,21 @@
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module Expectations
   ( shouldBeRight,
-    shouldVerifyWff,
     expr,
     shouldVerifyProof,
     shouldReportMistakes,
     shouldFail,
+    verifyStmt,
+    sampleSyntax
   )
 where
 
 import Data.Maybe
+import qualified Data.Set as S
 import qualified Data.Text as T
 import FitchToMM.Compressed (compressProof, packProof)
 import FitchToMM.Declarations
@@ -20,15 +24,11 @@ import FitchToMM.MMProof
 import FitchToMM.Parser
 import FitchToMM.Pretty
 import FitchToMM.ProofWriter
-import FitchToMM.SyntaxProver
 import Hmm
 import Prettyprinter
 import Prettyprinter.Render.String
-import Prettyprinter.Render.Text
 import Test.Hspec
-
-shouldVerifyWff :: T.Text -> Wff -> Expectation
-shouldVerifyWff baseTxt = shouldBeRight . verifyWff baseTxt
+import Test.QuickCheck
 
 shouldVerifyProof :: T.Text -> FitchProof -> Expectation
 shouldVerifyProof baseTxt theorem = shouldBeRight $ verifyProof baseTxt theorem
@@ -47,36 +47,36 @@ shouldBeRight (Right _) = pure ()
 
 verifyProof :: T.Text -> FitchProof -> Either String ()
 verifyProof baseTxt theorem@(FitchProof name _ _ _) = do
-  let label = T.unpack name
+  let l = T.unpack name
   -- Verify it in normal format
   let mmProof = fromJust $ fromFitchProof base theorem
   let metamath = pretty $ baseTxt <> sampleSyntaxMM
   let full = renderString $ layoutCompact $ vsep [metamath, prettyNormal mmProof]
   (_, db) <- mmParseFromString full
-  mmVerifiesLabel db label
+  mmVerifiesLabel db l
   -- Verify it in compressed format
   let mmCompressed = compressProof $ packProof $ mmProof
   let fullC = renderString $ layoutCompact $ vsep [metamath, prettyCompressed mmCompressed]
   (_, dbC) <- mmParseFromString fullC
-  mmVerifiesLabel dbC label
+  mmVerifiesLabel dbC l
 
-verifyWff :: T.Text -> Wff -> Either String ()
-verifyWff baseTxt wff = do
-  let label = "wff-proof"
-  let sexpr = renderStrict $ layoutCompact $ prettyWff $ wff
-  let (proof, _) = runProofWriter $ proveWff wff
-  let metamath =
-        baseTxt
-          <> sampleSyntaxMM
-          <> " ${ "
-          <> label
-          <> " $p wff "
-          <> sexpr
-          <> " $= "
-          <> (T.unwords $ listStack label proof)
-          <> " $. $} "
-  (_, db) <- mmParseFromString $ T.unpack $ metamath
-  mmVerifiesLabel db (T.unpack label)
+verifyStmt :: T.Text -> T.Text -> ProofWriter -> Either String ()
+verifyStmt baseTxt stmt pw = do
+  let l = "proof"
+      (proof, ProofProps _ dvrs) = runProofWriter pw
+      prettyPrf =
+        "${"
+          <+> (sep $ map prettyDVR $ S.toList dvrs)
+          <+> pretty l
+          <+> "$p"
+          <+> pretty stmt
+          <+> "$="
+          <+> (pretty $ T.unwords $ listStack l proof)
+          <+> "$."
+          <+> "$}"
+      database = T.unpack $ baseTxt <> sampleSyntaxMM
+  (_, db) <- mmParseFromString $ database ++ (renderString $ layoutCompact prettyPrf)
+  mmVerifiesLabel db (T.unpack l)
 
 sampleSyntax :: Language
 sampleSyntax = Language $ \case
@@ -106,3 +106,82 @@ sampleSyntaxMM =
 
 expr :: T.Text -> Wff
 expr = unsafeParseFormula $ sampleSyntax
+
+instance Arbitrary Wff where
+  arbitrary :: Gen Wff
+  arbitrary = sized genWff
+
+instance Arbitrary BinOp where
+  arbitrary :: Gen BinOp
+  arbitrary = elements [OpAnd, OpOr, OpImplies, OpIff]
+
+instance Arbitrary Quantifier where
+  arbitrary :: Gen Quantifier
+  arbitrary = elements [QntForall, QntExists, QntUnique]
+
+instance Arbitrary Term where
+  arbitrary :: Gen Term
+  arbitrary = sized genTrm
+
+genWff :: Int -> Gen Wff
+genWff 0 =
+  oneof
+    [ pure WffTrue,
+      pure WffFalse,
+      genWffMetavar
+    ]
+genWff n =
+  frequency
+    [ (2, pure WffTrue),
+      (2, pure WffFalse),
+      (2, genWffMetavar),
+      (4, WffNot <$> sub),
+      (4, WffBinOp <$> arbitrary <*> sub <*> sub),
+      (3, WffQnt <$> arbitrary <*> genVar <*> sub),
+      (3, genAtom),
+      (2, WffSub <$> arbitrary <*> genVar <*> sub)
+    ]
+  where
+    sub = genWff (n `div` 2)
+
+genTrm :: Int -> Gen Term
+genTrm 0 =
+  oneof
+    [ TrmVar <$> genVar,
+      genConst,
+      genTrmMetavar
+    ]
+genTrm n =
+  frequency
+    [ (1, TrmVar <$> genVar),
+      (1, genConst),
+      (1, genTrmMetavar),
+      (2, genFunc n),
+      (2, TrmSub <$> sub <*> genVar <*> sub)
+    ]
+  where
+    sub = genTrm (n `div` 2)
+
+genVar :: Gen T.Text
+genVar = T.singleton <$> elements ['w' .. 'z']
+
+genWffMetavar :: Gen Wff
+genWffMetavar = WffMetavar <$> elements ["phi", "psi", "chi", "phi_1", "psi_1", "chi_1"]
+
+genTrmMetavar :: Gen Term
+genTrmMetavar = TrmMetavar <$> elements ["trm_1", "trm_2", "trm_3", "trm_4", "trm_5"]
+
+genAtom :: Gen Wff
+genAtom = do
+  (name, ar) <- elements [("eq", 2), ("P", 1), ("Q", 2), ("R", 3)]
+  terms <- vectorOf ar arbitrary
+  pure $ WffAtom name terms
+
+genFunc :: Int -> Gen Term
+genFunc n = do
+  (name, ar) <- elements [("F", 1), ("G", 2), ("H", 3)]
+  terms <- vectorOf ar (genTrm (n `div` 2))
+  pure $ TrmFunc name terms
+
+genConst :: Gen Term
+genConst = TrmConst <$> elements ["C", "D", "E"]

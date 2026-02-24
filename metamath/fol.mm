@@ -1,21 +1,27 @@
 $(
---------------------------------------------------------------------------------
+################################################################################
+Natural Deduction for First-Order Logic
+################################################################################
+$)
+
+$(
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*
 Formal Grammar
---------------------------------------------------------------------------------
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*
 
-  We represent all formulas and terms simply as S-Expressions.
-  An S-Expression is a string representation of a tree recursively defined as either:
-  1. An atom which cannot be decomposed further (e.g., an operator name), or
-  2. A list of S-Expressions that is space-delimited and enclosed in
-    parentheses, where the first element of the list is typically the
-    operator and the rest the operands.
-  For example, ( and psi phi ) represents the conjunction of psi and phi.
+We represent all formulas and terms simply as S-Expressions.
+An S-Expression is a string representation of a tree recursively defined as either:
+1. An atom which cannot be decomposed further (e.g., an operator name), or
+2. A list of S-Expressions that is space-delimited and enclosed in
+  parentheses, where the first element of the list is typically the
+  operator and the rest the operands.
+For example, ( and psi phi ) represents the conjunction of psi and phi.
 
-  A judgement of natural deduction is represented as a list of assumptions the
-  judgement depends on (the "context"), followed by the turnstile symbol |- and
-  the formula that is proved.
-  For example, phi psi |- ( and phi psi ) represents the judgement that phi and
-  psi are true assuming phi and assuming psi.
+A judgement of natural deduction is represented as a list of assumptions the
+judgement depends on (the "context"), followed by the turnstile symbol |- and
+the formula that is proved.
+For example, phi psi |- ( and phi psi ) represents the judgement that phi and
+psi are true assuming phi and assuming psi.
 $)
 
 $( Constant symbols $)
@@ -48,9 +54,9 @@ $( Syntax for judgements $)
 stmt.jdg $a stmt ... |- phi $.
 
 $(
---------------------------------------------------------------------------------
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*
 Propositional Logic
---------------------------------------------------------------------------------
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*
 $)
 
 $( Logical symbols $)
@@ -65,7 +71,11 @@ wff.not     $a wff ( not phi ) $.
 wff.true    $a wff true $.
 wff.false   $a wff false  $.
 
-$( -------- Introduction Rules -------- $)
+$(
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+Introduction Rules
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+$)
 
 ${ $( Conjunction Introduction $)
   axm.and-intr.1 $e ; ... |- phi $.
@@ -98,7 +108,11 @@ $}
 $( Verum Introduction $)
 axm.true-intr $a ; ... |- true $.
 
-$( -------- Elimination Rules -------- $)
+$(
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+Elimination Rules
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+$)
 
 ${ $( Conjunction Elimination $)
   axm.and-elim.1 $e ; ... |- ( and phi psi ) $.
@@ -140,14 +154,19 @@ ${ $( Falsum Elimination $)
   axm.false-elim   $a ; ... |- phi $.
 $}
 
-$( -------- Other Rules -------- $)
+$(
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+Other Rules
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+$)
 
-$( Indirect Proof:
-   A form of reductio ad absurdum, or proof by contradiction.
-   Because this allows us to derive the law of excluded middle, this separates
-   intuitionistic from classical logic. $)
+
 ${
   axm.ip.1 $e ; ... ( not phi ) |- false $.
+  $( Indirect Proof:
+     A form of reductio ad absurdum, or proof by contradiction.
+     Because this allows us to derive the law of excluded middle, this separates
+     intuitionistic from classical logic. $)
   axm.ip   $a ; ... |- phi $.
 $}
 
@@ -155,13 +174,14 @@ $( Assumption Rule:
    We can assume something for the sake of argument. $)
 axm.assume $a ; ... phi |- phi $.
 
-$( Thinning Rule:
-   Also called "weakening". We can always add unused assumptions to our claims.
-   This is needed because we are presenting natural deduction in sequent-style
-   to work in Metamath, but in a Fitch-style proof this is used implicitly
-   whenever a subproof uses a result from an outer proof. $)
+
 ${
   axm.thin.1 $e ; ... |- phi $.
+  $( Thinning Rule:
+     Also called "weakening". We can always add unused assumptions to our
+     claims. This is needed because we are presenting natural deduction in
+     sequent-style to work in Metamath, but in a Fitch-style proof this is used
+     implicitly whenever a subproof uses a result from an outer proof. $)
   axm.thin   $a ; ... psi |- phi $.
 $}
 
@@ -217,10 +237,12 @@ prd.prd_1 $f prd prd_1 $.
 $v func_1 $.
 func.func_1 $f func func_1 $.
 
-$v trm_1 trm_2 trm_3 $.
+$v trm_1 trm_2 trm_3 trm_4 trm_5 $.
 trm.trm_1 $f trm trm_1 $.
 trm.trm_2 $f trm trm_2 $.
 trm.trm_3 $f trm trm_3 $.
+trm.trm_4 $f trm trm_4 $.
+trm.trm_5 $f trm trm_5 $.
 
 $v ..t ..u $.
 lst.t $f lst ..t $.
@@ -265,212 +287,461 @@ var._a     $f var _a $.
 var._x     $f var _x $.
 var._trm_1 $f var _trm_1 $.
 
-$( -------- Substitution --------
+$(
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+Non-Freeness & Proper Substitution
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-  Here we define a notion of proper substitution.
-  We say that a WFF phi replaces a variable x in another WFF psi with a term t
-  when phi is obtained by substituting every free occurrence of x in psi with t.
+The intelim rules of predicate logic depend on the notions of free/bound
+variables as well as proper (capture-avoiding) substitution, so we must define
+these first.
 
-  We will also require the substitution to be capture-avoiding. That is, x
-  should not be within the scope of a quantifier that uses a variable y also in
-  t, lest y becomes illegitimately bound to it ("captured") on substitution.
+We will first define these as statements of a different type than sequents, so
+that they may be treated as metalogical side-conditions. Later on we will use
+these statements to define a substitution operator so that it may be used within
+logical formulae, corresponding to the common notation [t/x] meaning "substitute
+t for x".
+
+Unlike set.mm, we will define these with a recursive syntactic breakdown on WFFs
+and terms, rather than expressing them via equivalences. Because of this, we
+will also introduce the syntax for the substitution operator here before it is
+defined, so that it can be recursed through.
 $)
 
-$c REPLACES WITH IN $.
+$c NONFREE REPLACES WITH IN sub $.
+
+stmt.nf-wffs $a stmt NONFREE x ... $.
+stmt.nf-trms $a stmt NONFREE x ..t $.
 
 stmt.sub-wff $a stmt phi REPLACES x IN psi WITH trm_1 $.
-stmt.sub-trm $a stmt ..t REPLACES x IN ..u WITH trm_1 $.
+stmt.sub-lst $a stmt ..t REPLACES x IN ..u WITH trm_1 $.
 
-$( Base cases: $)
+$( Substitution operator $)
+wff.sub $a wff ( sub trm_1 x phi ) $.
+$( Overload the substitution operator for terms $)
+trm.sub $a trm ( sub trm_1 x trm_2 ) $.
 
-$( x is replaced if it is the term in question $)
-sub.rep $a ; trm_1 REPLACES x IN x WITH trm_1 $.
+$(
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+Nonfreeness for terms
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+$)
 
-${ $( Nothing is replaced when there are no occurrences $)
-  $d x phi $.
-  sub.none-wff $a ; phi REPLACES x IN phi WITH trm_1 $.
-$} ${
+${
   $d x ..t $.
-  sub.none-trm $a ; ..t REPLACES x IN ..t WITH trm_1 $.
+  $( A variable that does not occur in a list is not free $)
+  nf.lst-none $a ; NONFREE x ..t $.
 $}
 
-$( Replacing a variable with itself changes nothing $)
-sub.id $a ; phi REPLACES x IN phi WITH x $.
-
-$( Recursive cases: $)
-
-${ $( Define for the logical connectives $)
-  sub.con.1  $e ; phi_1 REPLACES x IN phi_2 WITH trm_1 $.
-  sub.con.2  $e ; psi_1 REPLACES x IN psi_2 WITH trm_1 $.
-
-  sub.and     $a ; ( and phi_1 psi_1 )     REPLACES x IN ( and phi_2 psi_2 )     WITH trm_1 $.
-  sub.or      $a ; ( or phi_1 psi_1 )      REPLACES x IN ( or phi_2 psi_2 )      WITH trm_1 $.
-  sub.implies $a ; ( implies phi_1 psi_1 ) REPLACES x IN ( implies phi_2 psi_2 ) WITH trm_1 $.
-  sub.iff     $a ; ( iff phi_1 psi_1 )     REPLACES x IN ( iff phi_2 psi_2 )     WITH trm_1 $.
-$} ${
-  sub.not.1 $e ; phi_1 REPLACES x IN phi_2 WITH trm_1 $.
-  sub.not   $a ; ( not phi_1 ) REPLACES x IN ( not phi_2 ) WITH trm_1 $.
+${
+  $d x trm_1 $.
+  $( A variable that does not occur in a term is not free $)
+  nf.trm-none $p ; NONFREE x trm_1 $=
+    ( lst.single nf.lst-none ) ABCD $.
 $}
 
-${ $( And for quantifiers $)
-  $d y trm_1 $. $( Avoid variable capture $)
-  $d x y $.     $( Avoid replacing bound occurrences $)
-  sub.qnt.1 $e ; phi REPLACES x IN psi WITH trm_1 $.
-  sub.qnt   $a ; ( qnt_1 y phi ) REPLACES x IN ( qnt_1 y psi ) WITH trm_1 $.
-$}
-$( When x is bound, no substitution occurs $)
-sub.qnt-bound $a ; ( qnt_1 x phi ) REPLACES x IN ( qnt_1 x phi ) WITH trm_1 $.
-
-${ $( A predicate or function replaces if all its arguments do $)
-  sub.arg.1 $e ; ..t            REPLACES x IN ..u            WITH trm_1 $.
-  sub.prd   $a ; ( prd_1 ..t )  REPLACES x IN ( prd_1 ..u )  WITH trm_1 $.
-  sub.func  $a ; ( func_1 ..t ) REPLACES x IN ( func_1 ..u ) WITH trm_1 $.
-$} ${
-  sub.trm.1 $e ; trm_1     REPLACES x IN     trm_2 WITH trm_3 $.
-  sub.trm.2 $e ; ..t       REPLACES x IN ..u       WITH trm_3 $.
-  sub.trm   $a ; ..t trm_1 REPLACES x IN ..u trm_2 WITH trm_3 $.
+${
+  nf.trm-func.1 $e ; NONFREE x ..t $.
+  $( A variable is nonfree in an instance of function application when it is
+     nonfree in its arguments $)
+  nf.trm-func   $a ; NONFREE x ( func_1 ..t ) $.
 $}
 
-$( -------- Introduction Rules -------- $)
+${
+  nf.trm-sub-1.1 $e ; NONFREE x trm_1 $.
+  $( Nonfreeness for substitution (case where variables are the same)
+     A variable that does not occur because it is substituted with a different
+     term is not free (hence we do not need a hypothesis that it is also
+     nonfree in trm_2). $)
+  nf.trm-sub-1   $a ; NONFREE x ( sub trm_1 x trm_2 ) $.
+$}
 
-${ $( Universal Introduction $)
-  $d a ... $. $( 'a' must not occur in an undischarged assumption $)
-  axm.forall-intr.1 $e ; psi REPLACES a IN phi WITH x $.
-  axm.forall-intr.2 $e ; ... |- phi $. 
+${
+  $d x y $.
+  nf.trm-sub-2.1 $e ; NONFREE x trm_1 $.
+  nf.trm-sub-2.2 $e ; NONFREE x trm_2 $.
+  $( Nonfreeness for substitution (case where variables are distinct) $)
+  nf.trm-sub-2   $a ; NONFREE x ( sub trm_1 y trm_2 ) $.
+$}
+
+${
+  nf.lst.1 $e ; NONFREE x trm_1 $.
+  nf.lst.2 $e ; NONFREE x ..t $.
+  $( Nonfreeness for lists of terms $)
+  nf.lst   $a ; NONFREE x ..t trm_1 $.
+$}
+
+$(
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+Nonfreeness for WFFs
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+$)
+
+${
+  $d x ... $.
+  $( A variable that does not occur in a context is not free $)
+  nf.ctx-none $a ; NONFREE x ... $.
+$}
+
+${
+  $d x phi $.
+  $( A variable that does not occur in a WFF is not free $)
+  nf.wff-none $p ; NONFREE x phi $=
+    ( ctx.empty ctx.append nf.ctx-none ) CADBE $.
+$}
+
+${ 
+  $( Nonfreeness for the binary connectives $)
+  nf.wff-bin.1   $e ; NONFREE x phi $.
+  nf.wff-bin.2   $e ; NONFREE x psi $.
+  nf.wff-and     $a ; NONFREE x ( and phi psi ) $.
+  nf.wff-or      $a ; NONFREE x ( or phi psi ) $.
+  nf.wff-implies $a ; NONFREE x ( implies phi psi ) $.
+  nf.wff-iff     $a ; NONFREE x ( iff phi psi ) $.
+$}
+
+${ 
+  nf.wff-not.1 $e ; NONFREE x phi $.
+  $( Nonfreeness for negation $)
+  nf.wff-not   $a ; NONFREE x ( not phi ) $.
+$}
+
+${
+  nf.wff-prd.1 $e ; NONFREE x ..t $.
+  $( A variable is nonfree in a predicate when it is nonfree in its arguments $)
+  nf.wff-prd   $a ; NONFREE x ( prd_1 ..t ) $.
+$}
+
+$( Nonfreeness for quantifiers (case where variables are the same)
+   A variable that is bound by a quantifier is not free. $)
+nf.wff-qnt-1 $a ; NONFREE x ( qnt_1 x phi ) $.
+
+${
+  $d x y $.
+  nf.wff-qnt-2.1 $e ; NONFREE x phi $.
+  $( Nonfreeness for quantifiers (case where variables are distinct) $)
+  nf.wff-qnt-2   $a ; NONFREE x ( qnt_1 y phi ) $.
+$}
+
+${
+  nf.wff-sub-1.1 $e ; NONFREE x trm_1 $.
+  $( Nonfreeness for substitution (case where variables are the same)
+     A variable that does not occur because it is substituted with a different
+     term is not free (hence we do not need a hypothesis that it is also
+     nonfree in phi). $)
+  nf.wff-sub-1   $a ; NONFREE x ( sub trm_1 x phi ) $.
+$}
+
+${
+  $d x y $.
+  nf.wff-sub-2.1 $e ; NONFREE x trm_1 $.
+  nf.wff-sub-2.2 $e ; NONFREE x phi $.
+  $( Nonfreeness for substitution (case where variables are distinct) $)
+  nf.wff-sub-2   $a ; NONFREE x ( sub trm_1 y phi ) $.
+$}
+
+${ 
+  nf.ctx.1 $e ; NONFREE x ... $.
+  nf.ctx.2 $e ; NONFREE x phi $.
+  $( Nonfreeness for lists of WFFs $)
+  nf.ctx   $a ; NONFREE x ... phi $.
+$}
+
+$(
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+Proper Substitution for Terms
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+
+We say that "t1 REPLACES x IN t2 WITH t3" when t1 is obtained by substituting
+every free occurrence of x in t2 with t3.
+$)
+
+$( Replacing a single variable with a term just yields that term $)
+sub.trm-rep $a ; trm_1 REPLACES x IN x WITH trm_1 $.
+
+${
+  sub.trm-none.1 $e ; NONFREE x trm_1 $.
+  $( Nothing is replaced in a term when there are no free occurrences $)
+  sub.trm-none $a ; trm_1 REPLACES x IN trm_1 WITH trm_2 $.
+$}
+
+$( Replacing a variable with itself has no effect $)
+sub.trm-id $a ; trm_1 REPLACES x IN trm_1 WITH x $.
+
+${
+  sub.lst.1 $e ; trm_1     REPLACES x IN     trm_2 WITH trm_3 $.
+  sub.lst.2 $e ; ..t       REPLACES x IN ..u       WITH trm_3 $.
+  $( Recursively handle replacement for lists of terms $)
+  sub.lst   $a ; ..t trm_1 REPLACES x IN ..u trm_2 WITH trm_3 $.
+$}
+
+${ 
+  sub.trm-func.1 $e ; ..t REPLACES x IN ..u WITH trm_1 $.
+  $( A function replaces if all its arguments do $)
+  sub.trm-func  $a ; ( func_1 ..t ) REPLACES x IN ( func_1 ..u ) WITH trm_1 $.
+$}
+
+${
+  sub.trm-sub-1.1 $e ; trm_1 REPLACES x IN trm_2 WITH trm_4 $.
+  $( Replacement over the substitution operator (case where variables are the same)
+     The only occurrences (if any) of x in the expression t3[t2/x] are its
+     occurrences in the term t2 (its occurrences in t3 are substituted away).
+     Thus we only need to recursively check replacement over t2, and t3 should
+     remain unchanged. $)
+  sub.trm-sub-1   $a ; ( sub trm_1 x trm_3 ) REPLACES x IN
+                       ( sub trm_2 x trm_3 ) WITH trm_4 $.
+$}
+
+${
+  $d x y $.
+  sub.trm-sub-2.1 $e ; NONFREE y trm_5 $.
+  sub.trm-sub-2.2 $e ; trm_1 REPLACES x IN trm_2 WITH trm_5 $.
+  sub.trm-sub-2.3 $e ; trm_3 REPLACES x IN trm_4 WITH trm_5 $.
+  $( Replacement over the substitution operator (case where variables are distinct)
+     The nonfreeness hypothesis acts analogously to the capture-avoidance
+     condition for quantifiers: we do not want the term being inserted to
+     contain the variable that the outer substitution is replacing, lest the
+     substitution tacitly tampers with it. $)
+  sub.trm-sub-2   $a ; ( sub trm_1 y trm_3 ) REPLACES x IN
+                       ( sub trm_2 y trm_4 ) WITH trm_5 $.
+$}
+
+$(
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+Proper Substitution for WFFs
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+
+We say that "phi REPLACES x IN psi WITH t" when phi is obtained by substituting
+every free occurrence of x in psi with t.
+
+Here we must also require the substitution to be capture-avoiding. That is, x
+should not be within the scope of a quantifier that uses a variable y also in
+t, lest y becomes illegitimately bound to it ("captured") on substitution.
+$)
+
+${ 
+  sub.wff-none.1 $e ; NONFREE x phi $.
+  $( Nothing is replaced in a WFF when there are no free occurrences $)
+  sub.wff-none   $a ; phi REPLACES x IN phi WITH trm_1 $.
+$}
+
+$( Replacing a variable with itself has no effect $)
+sub.wff-id $a ; phi REPLACES x IN phi WITH x $.
+
+${
+  $( Define for the binary connectives $)
+  sub.wff-bin.1 $e ; phi_1 REPLACES x IN phi_2 WITH trm_1 $.
+  sub.wff-bin.2 $e ; psi_1 REPLACES x IN psi_2 WITH trm_1 $.
+
+  $( Recurse replacement through conjunction $)
+  sub.wff-and     $a ; ( and phi_1 psi_1 )     REPLACES x IN
+                       ( and phi_2 psi_2 )     WITH trm_1 $.
+  $( Recurse replacement through disjunction $)
+  sub.wff-or      $a ; ( or phi_1 psi_1 )      REPLACES x IN
+                       ( or phi_2 psi_2 )      WITH trm_1 $.
+  $( Recurse replacement through implication $)
+  sub.wff-implies $a ; ( implies phi_1 psi_1 ) REPLACES x IN
+                       ( implies phi_2 psi_2 ) WITH trm_1 $.
+  $( Recurse replacement through the biconditional $)
+  sub.wff-iff     $a ; ( iff phi_1 psi_1 )     REPLACES x IN
+                       ( iff phi_2 psi_2 )     WITH trm_1 $.
+$}
+
+${
+  sub.wff-not.1 $e ; phi_1 REPLACES x IN phi_2 WITH trm_1 $.
+  $( Recurse replacement through negation $)
+  sub.wff-not   $a ; ( not phi_1 ) REPLACES x IN ( not phi_2 ) WITH trm_1 $.
+$}
+
+${ 
+  sub.wff-prd.1 $e ; ..t REPLACES x IN ..u WITH trm_1 $.
+  $( A predicate replaces if all its arguments do $)
+  sub.wff-prd   $a ; ( prd_1 ..t ) REPLACES x IN ( prd_1 ..u ) WITH trm_1 $.
+$}
+
+${
+  $d x y $.
+  sub.wff-qnt.1 $e ; NONFREE y trm_1 $.
+  sub.wff-qnt.2 $e ; phi REPLACES x IN psi WITH trm_1 $.
+  $( Define substitution for quantifiers. The nonfreeness hypothesis acts to
+     avoid variable capture on y. Variables x and y must be distinct to prevent
+     the invalid replacement of bound occurences (the case where x and y are the
+     same is covered by sub.wff-none). $)
+  sub.wff-qnt   $a ; ( qnt_1 y phi ) REPLACES x IN ( qnt_1 y psi ) WITH trm_1 $.
+$}
+
+${
+  sub.wff-sub-1.1 $e ; trm_1 REPLACES x IN trm_2 WITH trm_3 $.
+  $( Replacement over the substitution operator (case where variables are the same)
+     The only occurrences (if any) of x in the expression phi[t/x] are its
+     occurrences in the term t. Thus we only need to recursively check
+     replacement over t, and phi should remain unchanged. $)
+  sub.wff-sub-1   $a ; ( sub trm_1 x phi ) REPLACES x IN
+                       ( sub trm_2 x phi ) WITH trm_3 $.
+$}
+
+${
+  $d x y $.
+  sub.wff-sub-2.1 $e ; NONFREE y trm_3 $.
+  sub.wff-sub-2.2 $e ; trm_1 REPLACES x IN trm_2 WITH trm_3 $.
+  sub.wff-sub-2.3 $e ; phi REPLACES x IN psi WITH trm_3 $.
+  $( Replacement over the substitution operator (case where variables are distinct)
+     The nonfreeness hypothesis acts analogously to the capture-avoidance
+     condition on quantifiers: we do not want the term being inserted to contain
+     the variable that the outer substitution is replacing, lest the substitution
+     tacitly tampers with it. $)
+  sub.wff-sub-2   $a ; ( sub trm_1 y phi ) REPLACES x IN
+                       ( sub trm_2 y psi ) WITH trm_3 $.
+$}
+
+$(
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+Introduction Rules
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+$)
+
+${ 
+  axm.forall-intr.1 $e ; NONFREE a ... $.
+  axm.forall-intr.2 $e ; NONFREE x phi $.
+  axm.forall-intr.3 $e ; psi REPLACES a IN phi WITH x $.
+  axm.forall-intr.4 $e ; ... |- phi $. 
+  $( Universal Introduction $)
   axm.forall-intr   $a ; ... |- ( forall x psi ) $. 
 $}
 
-${ $( Existential Introduction $)
+${ 
   axm.exists-intr.1 $e ; phi REPLACES x IN psi WITH trm_1 $.
   axm.exists-intr.2 $e ; ... |- phi $. 
+  $( Existential Introduction $)
   axm.exists-intr   $a ; ... |- ( exists x psi ) $. 
 $}
 
 $( Equality Introduction $)
 axm.eq-intr $a ; ... |- ( eq trm_1 trm_1 ) $.
 
-$( -------- Elimination Rules -------- $)
+$(
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+Elimination Rules
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+$)
 
-${ $( Universal Elimination $)
+${ 
   axm.forall-elim.1 $e ; psi REPLACES x IN phi WITH trm_1 $.
   axm.forall-elim.2 $e ; ... |- ( forall x phi ) $. 
+  $( Universal Elimination $)
   axm.forall-elim   $a ; ... |- psi $. 
 $}
 
-${ $( Existential Elimination $)
-  $d a ... $. $( 'a' must not occur in an undischarged assumption $)
-  $d a phi $. $( 'a' must not occur in phi $)
-  $d a chi $. $( 'a' must not occur in chi (the conclusion) $)
-  axm.exists-elim.1 $e ; psi REPLACES x IN phi WITH a $.
-  axm.exists-elim.2 $e ; ... |- ( exists x phi ) $. 
-  axm.exists-elim.3 $e ; ... psi |- chi $. 
+${ 
+  axm.exists-elim.1 $e ; NONFREE a ... $.
+  axm.exists-elim.2 $e ; NONFREE a phi $.
+  axm.exists-elim.3 $e ; NONFREE a chi $.
+  axm.exists-elim.4 $e ; psi REPLACES x IN phi WITH a $.
+  axm.exists-elim.5 $e ; ... |- ( exists x phi ) $. 
+  axm.exists-elim.6 $e ; ... psi |- chi $. 
+  $( Existential Elimination $)
   axm.exists-elim   $a ; ... |- chi $. 
 $}
 
-${ $( Equality Elimination $)
+${ 
   $d x trm_1 $. $d x trm_2 $.
   axm.eq-elim-1.1 $e ; phi REPLACES x IN chi WITH trm_1 $.
   axm.eq-elim-1.2 $e ; psi REPLACES x IN chi WITH trm_2 $.
   axm.eq-elim-1.3 $e ; ... |- ( eq trm_1 trm_2 ) $.
   axm.eq-elim-1.4 $e ; ... |- phi $.
+  $( Equality Elimination $)
   axm.eq-elim-1   $a ; ... |- psi $.
 $}
 
-$( The reverse direction of equality elimination is in fact derivable as a
-   theorem in our system, but in Fitch-style proofs we will permit using
-   "axm.eq-elim" to refer to either one. $)
 ${ 
   $d x trm_1 $. $d x trm_2 $.
   thm.eq-elim-2.1 $e ; phi REPLACES x IN chi WITH trm_1 $.
   thm.eq-elim-2.2 $e ; psi REPLACES x IN chi WITH trm_2 $.
   thm.eq-elim-2.3 $e ; ... |- ( eq trm_1 trm_2 ) $.
   thm.eq-elim-2.4 $e ; ... |- psi $.
+  $( The reverse direction of equality elimination is in fact derivable as a
+     theorem in our system, but in Fitch-style proofs we will permit using
+     "axm.eq-elim" to refer to either one. $)
   thm.eq-elim-2   $p ; ... |- phi $=
-    ( lst.single wff.atm sub.none-trm sub.rep sub.trm axm.eq-elim-1 prd.eq
-    lst.append sub.prd trm.var axm.eq-intr ) ACBDEGFIHARFFLZSZMRFGLZSZMRFEUALZSZ
-    MEFGERFUDUHEFFFUCUGEFUCNEFOPTERGUFUHEFFGUEUGEGUCNEGOPTJAFUBQKQ $.
+    ( lst.single wff.atm sub.trm-none sub.trm-rep sub.lst sub.wff-prd prd.eq
+    lst.append axm.eq-elim-1 trm.var nf.lst-none axm.eq-intr ) ACBDEGFIHARFFLZSZ
+    MRFGLZSZMRFEUALZSZMEFGERFUEUIEFFFUDUHEFFEUDUBZNEFOPQERGUGUIEFFGUFUHEFGUJNEGO
+    PQJAFUCTKT $.
 $}
 
 $(
---------------------------------------------------------------------------------
-First Order Logic - Conservative Extensions
---------------------------------------------------------------------------------
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
+Definitions
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 $)
-
-$( -------- Definitions -------- $)
 
 stmt.def $a stmt phi := psi $.
 
-${ $( Definiendum Introduction $)
+${ 
   axm.def-intr.1 $e ; phi := psi $.
   axm.def-intr.2 $e ; ... |- psi $.
+  $( Definiendum Introduction $)
   axm.def-intr   $a ; ... |- phi $.
 $}
 
-${ $( Definiendum Elimination $)
+${ 
   axm.def-elim.1 $e ; phi := psi $.
   axm.def-elim.2 $e ; ... |- phi $.
+  $( Definiendum Elimination $)
   axm.def-elim   $a ; ... |- psi $.
 $}
 
-$( -------- Substitution as an Operator --------
-
-  Up until now we have been expressing proper substitution with a metalogical
-  "REPLACES" predicate that relates a WFF to the one obtained by its
-  subtitution. However, it will be convenient to have a way of representing it 
-  _within_ formulae (corresponding to the common notation [t/x] to mean
-  "substitute t for x").
+$(
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+Substitution Operator
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
 $)
 
-$c sub $.
-
-wff.sub $a wff ( sub trm_1 x phi ) $.
-
-$( Define substitution $)
 ${
-  def.sub.1 $e ; psi REPLACES x IN phi WITH trm_1 $.
-  def.sub   $a ; ( sub trm_1 x phi ) := psi $.
+  def.sub-wff.1 $e ; psi REPLACES x IN phi WITH trm_1 $.
+  $( Define the substitution operator for WFFs $)
+  def.sub-wff   $a ; ( sub trm_1 x phi ) := psi $.
 $}
 
-$( This new syntax does not fit the mold of function/predicate/constant so we
-   must also extend the replacement predicate itself to recurse through it $)
-
-$( Case for where the substitution describes the very replacement at hand $)
-sub.sub-1 $a ; ( sub trm_1 x phi ) REPLACES x IN phi WITH trm_1 $.
-
 ${
-  $d y phi $.
-  $( If we replace a variable x with y, then replace y back with x, we return
-     to the original formula so long as 'y' was fresh (i.e., not previously
-     occurring in the formula). This rule provides a means for inference rules
-     that take replacement statements as hypotheses to 'eliminate' the
-     substitution operator (simplifying the expression). $)
-  sub.sub-2 $a ; phi REPLACES y IN ( sub y x phi ) WITH x $.
+  def.sub-trm.1 $e ; trm_2 REPLACES x IN trm_3 WITH trm_4 $.
+  $( Define the substitution operator for terms $)
+  def.sub-trm   $a ; ( eq trm_1 ( sub trm_4 x trm_3 ) ) := ( eq trm_1 trm_2 ) $.
 $}
 
-$( In the case where the substitution does not describe the replacement at
-   hand, we recurse through it, but require an analogous constraint to our
-   capture-avoidance rules for quantifiers: we do not want the term being
-   inserted to contain the variable that the outer substitution is replacing,
-   lest it tacitly tampers with the term. Nor do we want to replace occurrences
-   of the variable 'y', which should be considered substitued away in the
-   expression phi[trm_1/y] (i.e., not occuring unless y also occurs in trm_1).
-   
-   To reuse our existing capture-avoidance rules, we will introduce a "dummy"
-   quantifier called "for" to denote the syntactic status 'y' has in the
-   expression "substitute t for y in phi". $)
+$( We we also require special rules for substitution to allow rules that have
+   replacement hypotheses to recognize when the substitution operator may be
+   introduced or eliminated. $)
 
-$c for $.
-qnt.for $a qnt for $.
+$( Substitution introduction for terms $)
+sub.trm-intr $a ; ( sub trm_1 x trm_2 ) REPLACES x IN trm_2 WITH trm_1 $.
+
+$( Substitution introduction for WFFs $)
+sub.wff-intr $a ; ( sub trm_1 x phi ) REPLACES x IN phi WITH trm_1 $.
 
 ${
-  sub.sub-3.1 $e ; trm_1 REPLACES x IN trm_2 WITH trm_3 $.
-  sub.sub-3.2 $e ; ( for y phi ) REPLACES x IN ( for z psi ) WITH trm_3 $.
-  $( Case for where the substitution does not describe the replacement at hand $)
-  sub.sub-3   $a ; ( sub trm_1 y phi ) REPLACES x IN ( sub trm_2 z psi ) WITH trm_3 $.
+  sub.trm-elim.1 $e ; NONFREE y trm_1 $.
+  $( Substitution elimination for terms
+     Replacing a variable back with the original variable returns us to the
+     original term, so long as the intermediate variable was fresh (nonfree in
+     the original term). $)
+  sub.trm-elim   $a ; trm_1 REPLACES y IN ( sub y x trm_1 ) WITH x $.
 $}
 
-$( -------- Uniqueness Quantification -------- $)
+${
+  sub.wff-elim.1 $e ; NONFREE y phi $.
+  $( Substitution elimination for WFFs
+     Replacing a variable back with the original variable returns us to the
+     original formula, so long as the intermediate variable was fresh (nonfree
+     in the original formula). $)
+  sub.wff-elim   $a ; phi REPLACES y IN ( sub y x phi ) WITH x $.
+$}
+
+$(
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+Uniqueness Quantification
+-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.-.
+$)
 
 $c unique $.
 qnt.unique $a qnt unique $.

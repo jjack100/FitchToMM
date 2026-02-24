@@ -2,6 +2,7 @@
 
 module FitchToMM.Replacement
   ( proveReplWff,
+    proveReplTrm,
     solveForTrm,
     solveForWff,
   )
@@ -12,14 +13,16 @@ import qualified Control.Monad.Writer.Strict as W
 import Data.Monoid (First (..))
 import qualified Data.Text as T
 import FitchToMM.Declarations (AllowedSubs)
-import FitchToMM.Matcher (varsInLst, varsInTrm, varsInWff)
+import FitchToMM.Nonfree
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.SyntaxProver
 
+type Var = T.Text
+
 -- Given two formulae P and Q, and a variable x, determine what (if any) term
 -- t exists such that P replaces x in Q with t
-solveForTrm :: AllowedSubs -> Wff -> Wff -> T.Text -> Maybe Term
+solveForTrm :: AllowedSubs -> Wff -> Wff -> Var -> Maybe Term
 solveForTrm freeIn wff1 wff2 x = do
   candidate <- findSub wff1 wff2 >>= getFirst
   guard $ succeeded $ proveReplWff freeIn wff1 x wff2 candidate
@@ -53,13 +56,18 @@ solveForTrm freeIn wff1 wff2 x = do
       | f == f' = mconcat <$> zipWithM findSubTrm args args'
     findSubTrm (TrmConst c) (TrmConst c') | c == c' = Just mempty
     findSubTrm (TrmMetavar t) (TrmMetavar t') | t == t' = Just mempty
+    findSubTrm (TrmSub t1 _ t2) t2' | t2 == t2' = Just $ First $ Just t1
+    findSubTrm (TrmSub t1 y t2) (TrmSub t1' y' t2') | y == y' = do
+      trmSub <- findSubTrm t1 t1'
+      wffSub <- findSubTrm t2 t2'
+      return $ trmSub <> wffSub
     findSubTrm _ _ = Nothing
 
 -- Given two formulae P and Q, two terms t1 and t2, and a variable x, determine
 -- what (if any) formula R exists that has the variable x in those locations
 -- where Q swaps t1 for t2 compared to P. I.e., x serves as a placeholder to
 -- account for those differences between P and Q.
-solveForWff :: AllowedSubs -> Wff -> Wff -> Term -> Term -> T.Text -> Maybe Wff
+solveForWff :: AllowedSubs -> Wff -> Wff -> Term -> Term -> Var -> Maybe Wff
 solveForWff freeIn wff1 wff2 t1 t2 x = do
   candidate <- findSub wff1 wff2
   guard $ succeeded $ proveReplWff freeIn wff1 x candidate t1
@@ -93,251 +101,215 @@ solveForWff freeIn wff1 wff2 t1 t2 x = do
 
 -- Functions to prove a replacement statement once the substitution is known
 
-proveReplWff :: AllowedSubs -> Wff -> T.Text -> Wff -> Term -> ProofWriter
--- Handle trivial case where a variable is replaced with itself
-proveReplWff _ w x w' (TrmVar y)
-  | x == y,
-    w == w' = do
-      wPrf <- proveWff w
+proveReplWff :: AllowedSubs -> Wff -> Var -> Wff -> Term -> ProofWriter
+-- Nothing is replaced in a WFF when there are no free occurrences
+proveReplWff allowed ph x ph' t
+  | ph == ph',
+    let nfResult = proveNfWff allowed x ph,
+    succeeded nfResult = do
+      phPrf <- proveWff ph
       xPrf <- proveVar x
-      sPrf <- proveStep subIdStep
-      return $ wPrf <> xPrf <> sPrf
--- Handle case for where the variable to be replaced does not occur
-proveReplWff freeIn w x w' withTrm
-  | w == w',
-    not $ occursInWff freeIn x w = do
-      reqDisjointFor (VarHyp x) (varsInWff w)
-      wPrf <- proveWff w
-      vPrf <- proveVar x
-      tPrf <- proveTrm withTrm
-      sPrf <- proveStep subNoneWffStep
-      return $ wPrf <> vPrf <> tPrf <> sPrf
--- Handle binary connectives
-proveReplWff freeIn (WffBinOp op w1 w2) x (WffBinOp op' w1' w2') withTrm
+      tPrf <- proveTrm t
+      nfPrf <- nfResult
+      proveMMStep "sub.wff-none" [phPrf, xPrf, tPrf, nfPrf]
+-- Replacing a variable with itself changes nothing
+proveReplWff _ ph x ph' (TrmVar x')
+  | ph == ph',
+    x == x' = do
+      phPrf <- proveWff ph
+      xPrf <- proveVar x
+      proveMMStep "sub.wff-id" [phPrf, xPrf]
+-- Case for binary connectives
+proveReplWff allowed (WffBinOp op ph1 ps1) x (WffBinOp op' ph2 ps2) t
   | op == op' = do
-      ph1Prf <- proveWff w1
-      ps1Prf <- proveWff w2
-      ph2Prf <- proveWff w1'
-      ps2Prf <- proveWff w2'
-      vPrf <- proveVar x
-      tPrf <- proveTrm withTrm
-      let fHyps = ph1Prf <> ps1Prf <> ph2Prf <> ps2Prf <> vPrf <> tPrf
-      r1Prf <- proveReplWff freeIn w1 x w1' withTrm
-      r2Prf <- proveReplWff freeIn w2 x w2' withTrm
-      subPrf <- proveStep $ subBinOpStep op
-      return $ fHyps <> r1Prf <> r2Prf <> subPrf
--- Handle the unary connective (negation)
-proveReplWff freeIn (WffNot w) x (WffNot w') withTrm = do
-  ph1Prf <- proveWff w
-  ph2Prf <- proveWff w'
-  vPrf <- proveVar x
-  tPrf <- proveTrm withTrm
-  let fHyps = ph1Prf <> ph2Prf <> vPrf <> tPrf
-  rPrf <- proveReplWff freeIn w x w' withTrm
-  sPrf <- proveStep subNotStep
-  return $ fHyps <> rPrf <> sPrf
--- Handle quantifiers
-proveReplWff freeIn (WffQnt q y w) x (WffQnt q' y' w') withTrm
+      ph1Prf <- proveWff ph1
+      ps1Prf <- proveWff ps1
+      ph2Prf <- proveWff ph2
+      ps2Prf <- proveWff ps2
+      xPrf <- proveVar x
+      tPrf <- proveTrm t
+      rPrf1 <- proveReplWff allowed ph1 x ph2 t
+      rPrf2 <- proveReplWff allowed ps1 x ps2 t
+      let label OpAnd = "sub.wff-and"
+          label OpOr = "sub.wff-or"
+          label OpImplies = "sub.wff-implies"
+          label OpIff = "sub.wff-iff"
+      proveMMStep (label op) [ph1Prf, ps1Prf, ph2Prf, ps2Prf, xPrf, tPrf, rPrf1, rPrf2]
+-- Case for negation
+proveReplWff allowed (WffNot ph1) x (WffNot ph2) t = do
+  ph1Prf <- proveWff ph1
+  ph2Prf <- proveWff ph2
+  xPrf <- proveVar x
+  tPrf <- proveTrm t
+  rPrf <- proveReplWff allowed ph1 x ph2 t
+  proveMMStep "sub.wff-not" [ph1Prf, ph2Prf, xPrf, tPrf, rPrf]
+-- Case for predicates
+proveReplWff allowed (WffAtom p ts) x (WffAtom p' us) t
+  | p == p' = do
+      xPrf <- proveVar x
+      pPrf <- proveStep $ prdStep p
+      tPrf <- proveTrm t
+      tsPrf <- proveLst ts
+      usPrf <- proveLst us
+      rPrf <- proveReplLst allowed ts x us t
+      proveMMStep "sub.wff-prd" [xPrf, pPrf, tPrf, tsPrf, usPrf, rPrf]
+-- Case for quantifiers
+proveReplWff allowed (WffQnt q y ph) x (WffQnt q' y' ps) t
   | q == q',
     y == y',
-    y /= x,
-    not $ occursInTrm freeIn y withTrm = do
-      reqDisjoint (VarHyp y) (VarHyp x)
-      reqDisjointFor (VarHyp y) (varsInTrm withTrm)
-      phPrf <- proveWff w
-      psPrf <- proveWff w'
+    x /= y = do
+      reqDisjoint (VarHyp x) (VarHyp y)
+      phPrf <- proveWff ph
+      psPrf <- proveWff ps
       xPrf <- proveVar x
       yPrf <- proveVar y
       qPrf <- proveStep $ qntStep q
-      tPrf <- proveTrm withTrm
-      let fHyps = phPrf <> psPrf <> xPrf <> yPrf <> qPrf <> tPrf
-      rPrf <- proveReplWff freeIn w x w' withTrm
-      sPrf <- proveStep subQntStep
-      return $ fHyps <> rPrf <> sPrf
--- Handle case where the variable is bound
-proveReplWff _ (WffQnt q x w) v (WffQnt q' x' w') withTrm
-  | q == q',
-    x == x',
-    w == w',
-    x == v = do
-      phPrf <- proveWff w
-      xPrf <- proveVar x
-      qPrf <- proveStep $ qntStep q
-      tPrf <- proveTrm withTrm
-      sPrf <- proveStep subQntBoundStep
-      return $ phPrf <> xPrf <> qPrf <> tPrf <> sPrf
--- Handle predicates
-proveReplWff freeIn (WffAtom p args) v (WffAtom p' args') t
-  | p == p' = do
-      vPrf <- proveVar v
-      pPrf <- proveStep $ prdStep p
       tPrf <- proveTrm t
-      args1Prf <- proveLst args
-      args2Prf <- proveLst args'
-      rPrf <- proveReplLst freeIn args v args' t
-      subPrf <- proveStep subPrdStep
-      return $ vPrf <> pPrf <> tPrf <> args1Prf <> args2Prf <> rPrf <> subPrf
--- Handle substitution
-proveReplWff _ (WffSub t x w) x' w' t'
+      nfPrf <- proveNfTrm allowed y t
+      rPrf <- proveReplWff allowed ph x ps t
+      proveMMStep "sub.wff-qnt" [phPrf, psPrf, xPrf, yPrf, qPrf, tPrf, nfPrf, rPrf]
+-- Case for substitution (where variables are the same)
+proveReplWff allowed (WffSub t1 x ph) x' (WffSub t2 x'' ph') t3
+  | x == x',
+    x == x'',
+    ph == ph' = do
+      phPrf <- proveWff ph
+      xPrf <- proveVar x
+      t1Prf <- proveTrm t1
+      t2Prf <- proveTrm t2
+      t3Prf <- proveTrm t3
+      rPrf <- proveReplTrm allowed t1 x t2 t3
+      proveMMStep "sub.wff-sub-1" [phPrf, xPrf, t1Prf, t2Prf, t3Prf, rPrf]
+-- Case for substitution (where variables are distinct)
+proveReplWff allowed (WffSub t1 y ph) x (WffSub t2 y' ps) t3
+  | y == y',
+    x /= y = do
+      reqDisjoint (VarHyp x) (VarHyp y)
+      phPrf <- proveWff ph
+      psPrf <- proveWff ps
+      xPrf <- proveVar x
+      yPrf <- proveVar y
+      t1Prf <- proveTrm t1
+      t2Prf <- proveTrm t2
+      t3Prf <- proveTrm t3
+      nfPrf <- proveNfTrm allowed y t3
+      rPrf1 <- proveReplTrm allowed t1 x t2 t3
+      rPrf2 <- proveReplWff allowed ph x ps t3
+      proveMMStep "sub.wff-sub-2" [phPrf, psPrf, xPrf, yPrf, t1Prf, t2Prf, t3Prf, nfPrf, rPrf1, rPrf2]
+-- Case for substitution introduction
+proveReplWff _ (WffSub t x ph) x' ph' t'
   | t == t',
     x == x',
-    w == w' = do
-      wPrf <- proveWff w
+    ph == ph' = do
+      phPrf <- proveWff ph
       xPrf <- proveVar x
       tPrf <- proveTrm t
-      sPrf <- proveStep subSub1Step
-      return $ wPrf <> xPrf <> tPrf <> sPrf
-proveReplWff freeIn ph y (WffSub (TrmVar y') x ph') (TrmVar x')
-  | ph == ph',
+      proveMMStep "sub.wff-intr" [phPrf, xPrf, tPrf]
+-- Case for substitution elimination
+proveReplWff allowed ph y (WffSub (TrmVar y') x ph') (TrmVar x')
+  | y == y',
     x == x',
-    y == y',
-    not $ occursInWff freeIn y ph =
-      do
-        reqDisjointFor (VarHyp y) (varsInWff ph)
-        phPrf <- proveWff ph
-        xPrf <- proveVar x
-        yPrf <- proveVar y
-        sPrf <- proveStep subSub2Step
-        return $ phPrf <> xPrf <> yPrf <> sPrf
-proveReplWff freeIn (WffSub t1 y ph) x (WffSub t2 z ps) t3 =
-  do
-    phPrf <- proveWff ph
-    psPrf <- proveWff ps
-    xPrf <- proveVar x
-    yPrf <- proveVar y
-    zPrf <- proveVar z
-    t1Prf <- proveTrm t1
-    t2Prf <- proveTrm t2
-    t3Prf <- proveTrm t3
-    let fHyps = phPrf <> psPrf <> xPrf <> yPrf <> zPrf <> t1Prf <> t2Prf <> t3Prf
-    r1Prf <- proveReplTrm freeIn t1 x t2 t3
-    r2Prf <- proveReplWff freeIn (WffQnt QntFor y ph) x (WffQnt QntFor z ps) t3
-    sPrf <- proveStep subSub3Step
-    return $ fHyps <> r1Prf <> r2Prf <> sPrf
+    ph == ph' = do
+      phPrf <- proveWff ph
+      xPrf <- proveVar x
+      yPrf <- proveVar y
+      nfPrf <- proveNfWff allowed y ph
+      proveMMStep "sub.wff-elim" [phPrf, xPrf, yPrf, nfPrf]
 proveReplWff _ _ _ _ _ = W.lift $ Left Inapplicable
 
-proveReplLst :: AllowedSubs -> [Term] -> T.Text -> [Term] -> Term -> ProofWriter
--- Case for where the variable to be replaced does not occur
-proveReplLst freeIn l x l' withTrm
-  | l == l',
-    not $ any (occursInTrm freeIn x) l = do
-      reqDisjointFor (VarHyp x) (varsInLst l)
-      vPrf <- proveVar x
-      tPrf <- proveTrm withTrm
-      lPrf <- proveLst l
-      sPrf <- proveStep subNoneTrmStep
-      return $ vPrf <> tPrf <> lPrf <> sPrf
--- Recursive case
-proveReplLst freeIn lst1 v lst2 withTrm =
-  let proveItems [t1] [t2] = proveReplTrm freeIn t1 v t2 withTrm
-      proveItems (t1 : ts1) (t2 : ts2) = do
-        vPrf <- proveVar v
-        t1prf <- proveTrm t1
-        t2prf <- proveTrm t2
-        t3prf <- proveTrm withTrm
-        l1Prf <- provePrependLst ts1
-        l2Prf <- provePrependLst ts2
-        r1Prf <- proveItems [t1] [t2]
-        r2Prf <- proveItems ts1 ts2
-        sPrf <- proveStep subTrmStep
-        return $ vPrf <> t1prf <> t2prf <> t3prf <> l1Prf <> l2Prf <> r1Prf <> r2Prf <> sPrf
+proveReplLst :: AllowedSubs -> [Term] -> Var -> [Term] -> Term -> ProofWriter
+proveReplLst allowed lst1 x lst2 t3 =
+  let proveItems [t1] [t2] = proveReplTrm allowed t1 x t2 t3
+      proveItems (t1 : ts) (t2 : us) = do
+        xPrf <- proveVar x
+        t1Prf <- proveTrm t1
+        t2Prf <- proveTrm t2
+        t3Prf <- proveTrm t3
+        tsPrf <- provePrependLst ts
+        usPrf <- provePrependLst us
+        rPrf1 <- proveReplTrm allowed t1 x t2 t3
+        rPrf2 <- proveItems ts us
+        proveMMStep "sub.lst" [xPrf, t1Prf, t2Prf, t3Prf, tsPrf, usPrf, rPrf1, rPrf2]
       proveItems _ _ = W.lift $ Left EmptyList
-   in -- Reverse the lists before recursing over them because metamath expects
-      -- them to be built by appending rather than prepending
-      proveItems (reverse lst1) (reverse lst2)
+   in proveItems (reverse lst1) (reverse lst2)
 
-proveReplTrm :: AllowedSubs -> Term -> T.Text -> Term -> Term -> ProofWriter
-proveReplTrm freeIn trm1 v trm2 withTrm
-  | trm1 == trm2,
-    not $ occursInTrm freeIn v trm1 = do
-      reqDisjointFor (VarHyp v) (varsInTrm trm1)
-      vPrf <- proveVar v
-      tPrf <- proveTrm withTrm
-      lPrf <- proveLst [trm1]
-      sPrf <- proveStep subNoneTrmStep
-      return $ vPrf <> tPrf <> lPrf <> sPrf
-
--- Case where the term is the variable being replaced
-proveReplTrm _ trm v (TrmVar x) withTrm
-  | trm == withTrm,
-    v == x = do
+proveReplTrm :: AllowedSubs -> Term -> Var -> Term -> Term -> ProofWriter
+-- Replacing a single variable with a term just yields that term
+proveReplTrm _ t x (TrmVar x') t'
+  | t == t',
+    x == x' = do
       xPrf <- proveVar x
-      tPrf <- proveTrm trm
-      rPrf <- proveStep subRepStep
-      return $ xPrf <> tPrf <> rPrf
--- Case for where the term is a function of other terms
-proveReplTrm freeIn (TrmFunc f args) v (TrmFunc f' args') t
+      tPrf <- proveTrm t
+      proveMMStep "sub.trm-rep" [xPrf, tPrf]
+proveReplTrm allowed t1 x t1' t2
+  | t1 == t1',
+    let nfResult = proveNfTrm allowed x t1,
+    succeeded nfResult = do
+      xPrf <- proveVar x
+      t1Prf <- proveTrm t1
+      t2Prf <- proveTrm t2
+      nfPrf <- nfResult
+      proveMMStep "sub.trm-none" [xPrf, t1Prf, t2Prf, nfPrf]
+proveReplTrm _ t x t' (TrmVar x')
+  | t == t',
+    x == x' = do
+      xPrf <- proveVar x
+      tPrf <- proveTrm t
+      proveMMStep "sub.trm-id" [xPrf, tPrf]
+proveReplTrm allowed (TrmFunc f ts) x (TrmFunc f' us) t
   | f == f' = do
-      xPrf <- proveVar v
+      xPrf <- proveVar x
       fPrf <- proveStep $ funcStep f
       tPrf <- proveTrm t
-      args1Prf <- proveLst args
-      args2Prf <- proveLst args'
-      rPrf <- proveReplLst freeIn args v args' t
-      sPrf <- proveStep subFuncStep
-      return $ xPrf <> fPrf <> tPrf <> args1Prf <> args2Prf <> rPrf <> sPrf
+      tsPrf <- proveLst ts
+      usPrf <- proveLst us
+      rPrf <- proveReplLst allowed ts x us t
+      proveMMStep "sub.trm-func" [xPrf, fPrf, tPrf, tsPrf, usPrf, rPrf]
+-- Replacement over the substitution operator (case where variables are the same)
+proveReplTrm allowed (TrmSub t1 x t3) x' (TrmSub t2 x'' t3') t4
+  | x == x',
+    x == x'',
+    t3 == t3' = do
+      xPrf <- proveVar x
+      t1Prf <- proveTrm t1
+      t2Prf <- proveTrm t2
+      t3Prf <- proveTrm t3
+      t4Prf <- proveTrm t4
+      rPrf <- proveReplTrm allowed t1 x t2 t4
+      proveMMStep "sub.trm-sub-1" [xPrf, t1Prf, t2Prf, t3Prf, t4Prf, rPrf]
+-- Replacement over the substitution operator (case where variables are distinct)
+proveReplTrm allowed (TrmSub t1 y t3) x (TrmSub t2 y' t4) t5
+  | y == y',
+    x /= y = do
+      reqDisjoint (VarHyp x) (VarHyp y)
+      xPrf <- proveVar x
+      yPrf <- proveVar y
+      t1Prf <- proveTrm t1
+      t2Prf <- proveTrm t2
+      t3Prf <- proveTrm t3
+      t4Prf <- proveTrm t4
+      t5Prf <- proveTrm t5
+      nfPrf <- proveNfTrm allowed y t5
+      rPrf1 <- proveReplTrm allowed t1 x t2 t5
+      rPrf2 <- proveReplTrm allowed t3 x t4 t5
+      proveMMStep "sub.trm-sub-2" [xPrf, yPrf, t1Prf, t2Prf, t3Prf, t4Prf, t5Prf, nfPrf, rPrf1, rPrf2]
+-- Case for substitution introduction
+proveReplTrm _ (TrmSub t1 x t2) x' t2' t1'
+  | t1 == t1',
+    t2 == t2',
+    x == x' = do
+      xPrf <- proveVar x
+      t1Prf <- proveTrm t1
+      t2Prf <- proveTrm t2
+      proveMMStep "sub.trm-intr" [xPrf, t1Prf, t2Prf]
+-- Case for substitution elimination
+proveReplTrm allowed t y (TrmSub (TrmVar y') x t') (TrmVar x')
+  | t == t',
+    x == x',
+    y == y' = do
+      xPrf <- proveVar x
+      yPrf <- proveVar y
+      tPrf <- proveTrm t
+      nfPrf <- proveNfTrm allowed y t
+      proveMMStep "sub.trm-elim" [xPrf, yPrf, tPrf, nfPrf]
 proveReplTrm _ _ _ _ _ = W.lift $ Left Inapplicable
-
-occursInWff :: AllowedSubs -> T.Text -> Wff -> Bool
-occursInWff f x (WffBinOp _ lhs rhs) = occursInWff f x lhs || occursInWff f x rhs
-occursInWff f x (WffNot wff) = occursInWff f x wff
-occursInWff f x (WffQnt _ y wff) = x == y || occursInWff f x wff
-occursInWff f x (WffAtom _ args) = any (occursInTrm f x) args
-occursInWff f x (WffMetavar var) = x `elem` f var
-occursInWff f x (WffSub trm var wff) = x == var || occursInTrm f x trm || occursInWff f x wff
-occursInWff _ _ WffTrue = False
-occursInWff _ _ WffFalse = False
-
-occursInTrm :: AllowedSubs -> T.Text -> Term -> Bool
-occursInTrm _ x (TrmVar y) = x == y
-occursInTrm f x (TrmFunc _ args) = any (occursInTrm f x) args
-occursInTrm _ _ (TrmConst _) = False
-occursInTrm f x (TrmMetavar var) = x `elem` f var
-
--- Define the labels and number of mandatory hypotheses they take as they
--- appear in the Metamath database:
-
-subRepStep :: RpnStep
-subRepStep = RpnStep 2 "sub.rep"
-
-subNoneWffStep :: RpnStep
-subNoneWffStep = RpnStep 3 "sub.none-wff"
-
-subNoneTrmStep :: RpnStep
-subNoneTrmStep = RpnStep 3 "sub.none-trm"
-
-subIdStep :: RpnStep
-subIdStep = RpnStep 2 "sub.id"
-
-subBinOpStep :: BinOp -> RpnStep
-subBinOpStep OpAnd = RpnStep 8 "sub.and"
-subBinOpStep OpOr = RpnStep 8 "sub.or"
-subBinOpStep OpImplies = RpnStep 8 "sub.implies"
-subBinOpStep OpIff = RpnStep 8 "sub.iff"
-
-subNotStep :: RpnStep
-subNotStep = RpnStep 5 "sub.not"
-
-subQntStep :: RpnStep
-subQntStep = RpnStep 7 "sub.qnt"
-
-subQntBoundStep :: RpnStep
-subQntBoundStep = RpnStep 4 "sub.qnt-bound"
-
-subPrdStep :: RpnStep
-subPrdStep = RpnStep 6 "sub.prd"
-
-subFuncStep :: RpnStep
-subFuncStep = RpnStep 6 "sub.func"
-
-subTrmStep :: RpnStep
-subTrmStep = RpnStep 8 "sub.trm"
-
-subSub1Step :: RpnStep
-subSub1Step = RpnStep 3 "sub.sub-1"
-
-subSub2Step :: RpnStep
-subSub2Step = RpnStep 3 "sub.sub-2"
-
-subSub3Step :: RpnStep
-subSub3Step = RpnStep 10 "sub.sub-3"

@@ -422,7 +422,7 @@
             {
               "tag": "ProofStep",
               "expression": "phi",
-              "rule": "def.sub",
+              "rule": "def.sub-wff",
               "cites": [{ "tag": "Line", "contents": 1 }]
             }
           ]
@@ -434,7 +434,7 @@
             {
               "tag": "ProofStep",
               "expression": "( sub x x phi )",
-              "rule": "def.sub",
+              "rule": "def.sub-wff",
               "cites": [{ "tag": "Line", "contents": 3 }]
             }
           ]

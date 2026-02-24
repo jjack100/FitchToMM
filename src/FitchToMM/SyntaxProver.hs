@@ -10,135 +10,114 @@ module FitchToMM.SyntaxProver
     funcStep,
     prdStep,
     constStep,
-    binOpStep,
+    occursInWff,
+    occursInTrm,
   )
 where
 
 import Control.Monad.Writer.Strict
 import qualified Data.Text as T
+import FitchToMM.Declarations (AllowedSubs)
+import FitchToMM.FitchProof (Context)
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 
 proveWff :: Wff -> ProofWriter
 -- Handle binary connectives
-proveWff (WffBinOp op phi psi) = do
-  phiPrf <- proveWff phi
-  psiPrf <- proveWff psi
-  wffPrf <- proveStep $ binOpStep op
-  return $ phiPrf <> psiPrf <> wffPrf
+proveWff (WffBinOp op ph ps) = do
+  phPrf <- proveWff ph
+  psPrf <- proveWff ps
+  let label OpAnd = "wff.and"
+      label OpOr = "wff.or"
+      label OpImplies = "wff.implies"
+      label OpIff = "wff.iff"
+  proveMMStep (label op) [phPrf, psPrf]
 -- Handle negation
-proveWff (WffNot phi) = do
-  phiPrf <- proveWff phi
-  wffPrf <- proveStep wffNotStep
-  return $ phiPrf <> wffPrf
+proveWff (WffNot ph) = do
+  phPrf <- proveWff ph
+  proveMMStep "wff.not" [phPrf]
 -- Handle logical constants (true and false)
-proveWff WffTrue = proveStep wffTrueStep
-proveWff WffFalse = proveStep wffFalseStep
+proveWff WffTrue = proveMMStep "wff.true" []
+proveWff WffFalse = proveMMStep "wff.false" []
 -- Handle quantified formulas
-proveWff (WffQnt qnt var phi) = do
-  phiPrf <- proveWff phi
-  varPrf <- proveVar var
-  qntPrf <- proveStep $ qntStep qnt
-  wffPrf <- proveStep wffQntStep
-  return $ phiPrf <> varPrf <> qntPrf <> wffPrf
+proveWff (WffQnt qnt x ph) = do
+  phPrf <- proveWff ph
+  xPrf <- proveVar x
+  qPrf <- proveStep $ qntStep qnt
+  proveMMStep "wff.qnt" [phPrf, xPrf, qPrf]
 -- Handle atomic formulas formed by a predicate
 proveWff (WffAtom p args) = do
-  predPrf <- proveStep $ prdStep p
-  lstPrf <- proveLst args
-  wffPrf <- proveStep wffAtmStep
-  return $ predPrf <> lstPrf <> wffPrf
+  pPrf <- proveStep $ prdStep p
+  argsPrf <- proveLst args
+  proveMMStep "wff.atm" [pPrf, argsPrf]
 -- Handle metavariable representing an arbitrary WFF
 proveWff (WffMetavar var) = proveWffMetavar var
 -- Handle substitution
-proveWff (WffSub trm var phi) = do
-  phiPrf <- proveWff phi
-  varPrf <- proveVar var
-  trmPrf <- proveTrm trm
-  wffPrf <- proveStep wffSubStep
-  return $ phiPrf <> varPrf <> trmPrf <> wffPrf
+proveWff (WffSub t x ph) = do
+  phPrf <- proveWff ph
+  xPrf <- proveVar x
+  tPrf <- proveTrm t
+  proveMMStep "wff.sub" [phPrf, xPrf, tPrf]
 
--- Metamath expects a list to be built by appending rather than prepending,
--- so we must reverse the items first
+-- Our Metamath database expects a list to be built by appending rather than
+-- prepending, so we must reverse the items first
 proveLst :: [Term] -> ProofWriter
 proveLst = provePrependLst . reverse
 
 provePrependLst :: [Term] -> ProofWriter
 provePrependLst [term] = do
   trmPrf <- proveTrm term
-  singlePrf <- proveStep lstSingleStep
-  return $ trmPrf <> singlePrf
+  proveMMStep "lst.single" [trmPrf]
 provePrependLst (term : terms) = do
   trmPrf <- proveTrm term
   lstPrf <- provePrependLst terms
-  appendPrf <- proveStep lstAppendStep
-  return $ trmPrf <> lstPrf <> appendPrf
+  proveMMStep "lst.append" [trmPrf, lstPrf]
 provePrependLst _ = lift $ Left EmptyList
 
 proveTrm :: Term -> ProofWriter
 proveTrm (TrmVar x) = do
   varPrf <- proveVar x
-  trmPrf <- proveStep trmVarStep
-  return $ varPrf <> trmPrf
+  proveMMStep "trm.var" [varPrf]
 proveTrm (TrmFunc f args) = do
-  funcPrf <- proveStep $ funcStep f
-  lstPrf <- proveLst args
-  trmPrf <- proveStep trmFuncStep
-  return $ funcPrf <> lstPrf <> trmPrf
-proveTrm (TrmConst name) = proveStep $ constStep name
+  fPrf <- proveStep $ funcStep f
+  argsPrf <- proveLst args
+  proveMMStep "trm.func" [fPrf, argsPrf]
+proveTrm (TrmConst c) = proveStep $ constStep c
 proveTrm (TrmMetavar var) = proveTrmMetavar var
+proveTrm (TrmSub t1 x t2) = do
+  xPrf <- proveVar x
+  t1Prf <- proveTrm t1
+  t2Prf <- proveTrm t2
+  proveMMStep "trm.sub" [xPrf, t1Prf, t2Prf]
 
-proveCtx :: [Wff] -> ProofWriter
+proveCtx :: Context -> ProofWriter
 proveCtx [] = proveEllipsis
 proveCtx (phi : rest) = do
   ctxPrf <- proveCtx rest
   wffPrf <- proveWff phi
-  appendPrf <- proveStep ctxAppendStep
-  return $ ctxPrf <> wffPrf <> appendPrf
+  proveMMStep "ctx.append" [ctxPrf, wffPrf]
 
--- Define the labels and number of mandatory hypotheses they take as they
--- appear in the Metamath database:
+occursInWff :: AllowedSubs -> T.Text -> Wff -> Bool
+occursInWff a x (WffBinOp _ lhs rhs) = occursInWff a x lhs || occursInWff a x rhs
+occursInWff a x (WffNot wff) = occursInWff a x wff
+occursInWff a x (WffQnt _ y wff) = x == y || occursInWff a x wff
+occursInWff a x (WffAtom _ args) = any (occursInTrm a x) args
+occursInWff a x (WffMetavar var) = x `elem` a var
+occursInWff a x (WffSub trm var wff) = x == var || occursInTrm a x trm || occursInWff a x wff
+occursInWff _ _ WffTrue = False
+occursInWff _ _ WffFalse = False
 
-ctxAppendStep :: RpnStep
-ctxAppendStep = RpnStep 2 "ctx.append"
-
-binOpStep :: BinOp -> RpnStep
-binOpStep OpAnd = RpnStep 2 "wff.and"
-binOpStep OpOr = RpnStep 2 "wff.or"
-binOpStep OpImplies = RpnStep 2 "wff.implies"
-binOpStep OpIff = RpnStep 2 "wff.iff"
-
-wffNotStep :: RpnStep
-wffNotStep = RpnStep 1 "wff.not"
-
-wffTrueStep :: RpnStep
-wffTrueStep = RpnStep 0 "wff.true"
-
-wffFalseStep :: RpnStep
-wffFalseStep = RpnStep 0 "wff.false"
+occursInTrm :: AllowedSubs -> T.Text -> Term -> Bool
+occursInTrm _ x (TrmVar y) = x == y
+occursInTrm a x (TrmFunc _ args) = any (occursInTrm a x) args
+occursInTrm _ _ (TrmConst _) = False
+occursInTrm a x (TrmMetavar var) = x `elem` a var
+occursInTrm a x (TrmSub t1 var t2) = occursInTrm a x t1 || x == var || occursInTrm a x t2
 
 qntStep :: Quantifier -> RpnStep
 qntStep QntForall = RpnStep 0 "qnt.forall"
 qntStep QntExists = RpnStep 0 "qnt.exists"
 qntStep QntUnique = RpnStep 0 "qnt.unique"
-qntStep QntFor = RpnStep 0 "qnt.for"
-
-wffQntStep :: RpnStep
-wffQntStep = RpnStep 3 "wff.qnt"
-
-trmVarStep :: RpnStep
-trmVarStep = RpnStep 1 "trm.var"
-
-trmFuncStep :: RpnStep
-trmFuncStep = RpnStep 2 "trm.func"
-
-wffAtmStep :: RpnStep
-wffAtmStep = RpnStep 2 "wff.atm"
-
-lstSingleStep :: RpnStep
-lstSingleStep = RpnStep 1 "lst.single"
-
-lstAppendStep :: RpnStep
-lstAppendStep = RpnStep 2 "lst.append"
 
 funcStep :: T.Text -> RpnStep
 funcStep funcName = RpnStep 0 $ "func." <> funcName
@@ -148,6 +127,3 @@ prdStep prdName = RpnStep 0 $ "prd." <> prdName
 
 constStep :: T.Text -> RpnStep
 constStep constName = RpnStep 0 $ "trm." <> constName
-
-wffSubStep :: RpnStep
-wffSubStep = RpnStep 3 "wff.sub"
