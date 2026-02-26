@@ -1,0 +1,239 @@
+{
+    "$defs": {
+        "ProofStep": {
+            "description": "ProofStep",
+            "oneOf": [
+                {
+                    "properties": {
+                        "assumption": {
+                            "description": "An assumption to be made for the sake of argument",
+                            "type": "string"
+                        },
+                        "substeps": {
+                            "items": {
+                                "$ref": "#/$defs/ProofStep"
+                            },
+                            "type": "array"
+                        },
+                        "type": {
+                            "const": "subproof"
+                        }
+                    },
+                    "required": [
+                        "type",
+                        "substeps",
+                        "assumption"
+                    ],
+                    "type": "object"
+                },
+                {
+                    "properties": {
+                        "cites": {
+                            "description": "List of previous lines or subproofs that satisfy the premises of the rule",
+                            "items": {
+                                "oneOf": [
+                                    {
+                                        "maximum": 9223372036854775807,
+                                        "minimum": -9223372036854775808,
+                                        "type": "integer"
+                                    },
+                                    {
+                                        "items": {
+                                            "maximum": 9223372036854775807,
+                                            "minimum": -9223372036854775808,
+                                            "type": "integer"
+                                        },
+                                        "type": "array"
+                                    }
+                                ]
+                            },
+                            "type": "array"
+                        },
+                        "expression": {
+                            "description": "S-expression representation of the formula proven at this step",
+                            "type": "string"
+                        },
+                        "rule": {
+                            "description": "The rule being referenced as a justification (either a Metamath label or a built-in rule)\nMMLabel"
+                        },
+                        "type": {
+                            "const": "step"
+                        }
+                    },
+                    "required": [
+                        "type",
+                        "cites",
+                        "rule",
+                        "expression"
+                    ],
+                    "type": "object"
+                }
+            ],
+            "type": "object"
+        }
+    },
+    "description": "Collection",
+    "properties": {
+        "items": {
+            "description": "Items the collection contains",
+            "items": {
+                "description": "Item",
+                "oneOf": [
+                    {
+                        "properties": {
+                            "allowedSubs": {
+                                "description": "Map from metavariables to a list of variables that may occur in the substituted formula or term\nAllowedSubs"
+                            },
+                            "definiendum": {
+                                "description": "The formula containing the defined symbol, to be equated with the definiens",
+                                "type": "string"
+                            },
+                            "definiens": {
+                                "description": "The formula on the right-hand side of ':=', used to define the symbol",
+                                "type": "string"
+                            },
+                            "label": {
+                                "description": "MMLabel"
+                            },
+                            "symbol": {
+                                "description": "The symbol to be defined\nSymbol",
+                                "oneOf": [
+                                    {
+                                        "properties": {
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "type": {
+                                                "const": "constant"
+                                            }
+                                        },
+                                        "required": [
+                                            "type",
+                                            "name"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    {
+                                        "properties": {
+                                            "arity": {
+                                                "description": "Number of arguments the predicate or function accepts",
+                                                "maximum": 9223372036854775807,
+                                                "minimum": -9223372036854775808,
+                                                "type": "integer"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "type": {
+                                                "const": "predicate"
+                                            }
+                                        },
+                                        "required": [
+                                            "type",
+                                            "arity",
+                                            "name"
+                                        ],
+                                        "type": "object"
+                                    },
+                                    {
+                                        "properties": {
+                                            "arity": {
+                                                "description": "Number of arguments the predicate or function accepts",
+                                                "maximum": 9223372036854775807,
+                                                "minimum": -9223372036854775808,
+                                                "type": "integer"
+                                            },
+                                            "name": {
+                                                "type": "string"
+                                            },
+                                            "type": {
+                                                "const": "function"
+                                            }
+                                        },
+                                        "required": [
+                                            "type",
+                                            "arity",
+                                            "name"
+                                        ],
+                                        "type": "object"
+                                    }
+                                ],
+                                "type": "object"
+                            },
+                            "type": {
+                                "const": "definition"
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "definiens",
+                            "definiendum",
+                            "symbol",
+                            "allowedSubs",
+                            "label"
+                        ],
+                        "type": "object"
+                    },
+                    {
+                        "properties": {
+                            "allowedSubs": {
+                                "description": "Map from metavariables to a list of variables that may occur in the substituted formula or term\nAllowedSubs"
+                            },
+                            "label": {
+                                "description": "MMLabel"
+                            },
+                            "premises": {
+                                "items": {
+                                    "description": "Premise",
+                                    "properties": {
+                                        "condition": {
+                                            "description": "The condition that should be satisfied as a premise to the theorem",
+                                            "type": "string"
+                                        },
+                                        "supposition": {
+                                            "description": "A supposition from which the condition should follow, to be discharged in an application of the theorem",
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "condition"
+                                    ],
+                                    "type": "object"
+                                },
+                                "type": "array"
+                            },
+                            "steps": {
+                                "items": {
+                                    "$ref": "#/$defs/ProofStep"
+                                },
+                                "type": "array"
+                            },
+                            "type": {
+                                "const": "theorem"
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "steps",
+                            "premises",
+                            "allowedSubs",
+                            "label"
+                        ],
+                        "type": "object"
+                    }
+                ],
+                "type": "object"
+            },
+            "type": "array"
+        },
+        "title": {
+            "description": "The title of the collection",
+            "type": "string"
+        }
+    },
+    "required": [
+        "items",
+        "title"
+    ],
+    "type": "object"
+}

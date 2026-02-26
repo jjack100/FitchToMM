@@ -20,6 +20,11 @@
           };
         };
 
+        packages.schemas = pkgs.runCommand "fitch-to-mm-schemas" {} ''
+          mkdir -p $out
+          cp -r ${./schemas}/* $out/
+        '';
+
         devShells.default = pkgs.mkShell {
           name = "fitch-to-mm-dev";
           buildInputs = with pkgs.haskellPackages; [

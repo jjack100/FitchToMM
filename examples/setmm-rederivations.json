@@ -2,822 +2,762 @@
   "title": "Set.mm Rederivations",
   "items": [
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax-1",
       "allowedSubs": {},
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "phi",
           "substeps": [
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "psi",
               "substeps": [
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "phi",
                   "rule": "reiteration",
-                  "cites": [{ "tag": "Line", "contents": 1 }]
+                  "cites": [1]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( implies psi phi )",
               "rule": "axm.implies-intr",
-              "cites": [{ "tag": "Range", "contents": [2, 3] }]
+              "cites": [[2, 3]]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( implies phi ( implies psi phi ) )",
           "rule": "axm.implies-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 4] }]
+          "cites": [[1, 4]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax-2",
       "allowedSubs": {},
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( implies phi ( implies psi chi ) )",
           "substeps": [
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "( implies phi psi )",
               "substeps": [
                 {
-                  "tag": "Subproof",
+                  "type": "subproof",
                   "assumption": "phi",
                   "substeps": [
                     {
-                      "tag": "ProofStep",
+                      "type": "step",
                       "expression": "( implies psi chi )",
                       "rule": "axm.implies-elim",
-                      "cites": [
-                        { "tag": "Line", "contents": 1 },
-                        { "tag": "Line", "contents": 3 }
-                      ]
+                      "cites": [1, 3]
                     },
                     {
-                      "tag": "ProofStep",
+                      "type": "step",
                       "expression": "psi",
                       "rule": "axm.implies-elim",
-                      "cites": [
-                        { "tag": "Line", "contents": 2 },
-                        { "tag": "Line", "contents": 3 }
-                      ]
+                      "cites": [2, 3]
                     },
                     {
-                      "tag": "ProofStep",
+                      "type": "step",
                       "expression": "chi",
                       "rule": "axm.implies-elim",
-                      "cites": [
-                        { "tag": "Line", "contents": 4 },
-                        { "tag": "Line", "contents": 5 }
-                      ]
+                      "cites": [4, 5]
                     }
                   ]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( implies phi chi )",
                   "rule": "axm.implies-intr",
-                  "cites": [{ "tag": "Range", "contents": [3, 6] }]
+                  "cites": [[3, 6]]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( implies ( implies phi psi ) ( implies phi chi ) )",
               "rule": "axm.implies-intr",
-              "cites": [{ "tag": "Range", "contents": [2, 7] }]
+              "cites": [[2, 7]]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( implies ( implies phi ( implies psi chi ) ) ( implies ( implies phi psi ) ( implies phi chi ) ) )",
           "rule": "axm.implies-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 8] }]
+          "cites": [[1, 8]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax-3",
       "allowedSubs": {},
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( implies ( not phi ) ( not psi ) )",
           "substeps": [
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "psi",
               "substeps": [
                 {
-                  "tag": "Subproof",
+                  "type": "subproof",
                   "assumption": "( not phi )",
                   "substeps": [
                     {
-                      "tag": "ProofStep",
+                      "type": "step",
                       "expression": "( not psi )",
                       "rule": "axm.implies-elim",
-                      "cites": [
-                        { "tag": "Line", "contents": 1 },
-                        { "tag": "Line", "contents": 3 }
-                      ]
+                      "cites": [1, 3]
                     },
                     {
-                      "tag": "ProofStep",
+                      "type": "step",
                       "expression": "false",
                       "rule": "axm.not-elim",
-                      "cites": [
-                        { "tag": "Line", "contents": 2 },
-                        { "tag": "Line", "contents": 4 }
-                      ]
+                      "cites": [2, 4]
                     }
                   ]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "phi",
                   "rule": "axm.ip",
-                  "cites": [{ "tag": "Range", "contents": [3, 5] }]
+                  "cites": [[3, 5]]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( implies psi phi )",
               "rule": "axm.implies-intr",
-              "cites": [{ "tag": "Range", "contents": [2, 6] }]
+              "cites": [[2, 6]]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( implies ( implies ( not phi ) ( not psi ) ) ( implies psi phi ) )",
           "rule": "axm.implies-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 7] }]
+          "cites": [[1, 7]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax-4",
       "allowedSubs": { "phi": ["x"], "psi": ["x"] },
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( forall x ( implies phi psi ) )",
           "substeps": [
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "( forall x phi )",
               "substeps": [
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( implies ( sub a x phi ) ( sub a x psi ) )",
                   "rule": "axm.forall-elim",
-                  "cites": [{ "tag": "Line", "contents": 1 }]
+                  "cites": [1]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( sub a x phi )",
                   "rule": "axm.forall-elim",
-                  "cites": [{ "tag": "Line", "contents": 2 }]
+                  "cites": [2]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( sub a x psi )",
                   "rule": "axm.implies-elim",
-                  "cites": [
-                    { "tag": "Line", "contents": 3 },
-                    { "tag": "Line", "contents": 4 }
-                  ]
+                  "cites": [3, 4]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( forall x psi )",
                   "rule": "axm.forall-intr",
-                  "cites": [{ "tag": "Line", "contents": 5 }]
+                  "cites": [5]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( implies ( forall x phi ) ( forall x psi ) )",
               "rule": "axm.implies-intr",
-              "cites": [{ "tag": "Range", "contents": [2, 6] }]
+              "cites": [[2, 6]]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( implies ( forall x ( implies phi psi ) ) ( implies ( forall x phi ) ( forall x psi ) ) )",
           "rule": "axm.implies-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 7] }]
+          "cites": [[1, 7]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax-5",
       "allowedSubs": {},
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "phi",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( forall x phi )",
               "rule": "axm.forall-intr",
-              "cites": [{ "tag": "Line", "contents": 1 }]
+              "cites": [1]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( implies phi ( forall x phi ) )",
           "rule": "axm.implies-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 2] }]
+          "cites": [[1, 2]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax6v",
       "allowedSubs": {},
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( forall x ( not ( eq x trm_1 ) ) )",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( not ( eq trm_1 trm_1 ) )",
               "rule": "axm.forall-elim",
-              "cites": [{ "tag": "Line", "contents": 1 }]
+              "cites": [1]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( eq trm_1 trm_1 )",
               "rule": "axm.eq-intr",
               "cites": []
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "false",
               "rule": "axm.not-elim",
-              "cites": [
-                { "tag": "Line", "contents": 3 },
-                { "tag": "Line", "contents": 2 }
-              ]
+              "cites": [3, 2]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( not ( forall x ( not ( eq x trm_1 ) ) ) )",
           "rule": "axm.not-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 4] }]
+          "cites": [[1, 4]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax-7",
       "allowedSubs": {},
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( eq trm_1 trm_2 )",
           "substeps": [
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "( eq trm_1 trm_3 )",
               "substeps": [
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( eq trm_2 trm_3 )",
                   "rule": "axm.eq-elim",
-                  "cites": [
-                    { "tag": "Line", "contents": 1 },
-                    { "tag": "Line", "contents": 2 }
-                  ]
+                  "cites": [1, 2]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( implies ( eq trm_1 trm_3 ) ( eq trm_2 trm_3 ) )",
               "rule": "axm.implies-intr",
-              "cites": [{ "tag": "Range", "contents": [2, 3] }]
+              "cites": [[2, 3]]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( implies ( eq trm_1 trm_2 ) ( implies ( eq trm_1 trm_3 ) ( eq trm_2 trm_3 ) ) )",
           "rule": "axm.implies-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 4] }]
+          "cites": [[1, 4]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax-10",
       "allowedSubs": { "phi": ["x"] },
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( not ( forall x phi ) )",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( forall x ( not ( forall x phi ) ) )",
               "rule": "axm.forall-intr",
-              "cites": [{ "tag": "Line", "contents": 1 }]
+              "cites": [1]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( implies ( not ( forall x phi ) ) ( forall x ( not ( forall x phi ) ) ) )",
           "rule": "axm.implies-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 2] }]
+          "cites": [[1, 2]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.ax-11",
       "allowedSubs": { "phi": ["x", "y"] },
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( forall x ( forall y phi ) )",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( forall y ( sub a x phi ) )",
               "rule": "axm.forall-elim",
-              "cites": [{ "tag": "Line", "contents": 1 }]
+              "cites": [1]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( sub a x ( sub b y phi ) )",
               "rule": "axm.forall-elim",
-              "cites": [{ "tag": "Line", "contents": 2 }]
+              "cites": [2]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( forall x ( sub b y phi ) )",
               "rule": "axm.forall-intr",
-              "cites": [{ "tag": "Line", "contents": 3 }]
+              "cites": [3]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( forall y ( forall x phi ) )",
               "rule": "axm.forall-intr",
-              "cites": [{ "tag": "Line", "contents": 4 }]
+              "cites": [4]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( implies ( forall x ( forall y phi ) ) ( forall y ( forall x phi ) ) )",
           "rule": "axm.implies-intr",
-          "cites": [{ "tag": "Range", "contents": [1, 5] }]
+          "cites": [[1, 5]]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.sbid",
       "allowedSubs": { "phi": ["x"] },
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( sub x x phi )",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "phi",
               "rule": "def.sub-wff",
-              "cites": [{ "tag": "Line", "contents": 1 }]
+              "cites": [1]
             }
           ]
         },
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "phi",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( sub x x phi )",
               "rule": "def.sub-wff",
-              "cites": [{ "tag": "Line", "contents": 3 }]
+              "cites": [3]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( iff ( sub x x phi ) phi )",
           "rule": "axm.iff-intr",
           "cites": [
-            { "tag": "Range", "contents": [1, 2] },
-            { "tag": "Range", "contents": [3, 4] }
+            [1, 2],
+            [3, 4]
           ]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.sb5",
       "allowedSubs": { "phi": ["x"] },
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( sub trm_1 x phi )",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( eq trm_1 trm_1 )",
               "rule": "axm.eq-intr",
               "cites": []
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( and ( eq trm_1 trm_1 ) ( sub trm_1 x phi ) )",
               "rule": "axm.and-intr",
-              "cites": [
-                { "tag": "Line", "contents": 2 },
-                { "tag": "Line", "contents": 1 }
-              ]
+              "cites": [2, 1]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( exists x ( and ( eq x trm_1 ) phi ) )",
               "rule": "axm.exists-intr",
-              "cites": [{ "tag": "Line", "contents": 3 }]
+              "cites": [3]
             }
           ]
         },
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( exists x ( and ( eq x trm_1 ) phi ) )",
           "substeps": [
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "( and ( eq a trm_1 ) ( sub a x phi ) )",
               "substeps": [
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( eq a trm_1 )",
                   "rule": "axm.and-elim",
-                  "cites": [{ "tag": "Line", "contents": 6 }]
+                  "cites": [6]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( sub a x phi )",
                   "rule": "axm.and-elim",
-                  "cites": [{ "tag": "Line", "contents": 6 }]
+                  "cites": [6]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( sub trm_1 x phi )",
                   "rule": "axm.eq-elim",
-                  "cites": [
-                    { "tag": "Line", "contents": 7 },
-                    { "tag": "Line", "contents": 8 }
-                  ]
+                  "cites": [7, 8]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( sub trm_1 x phi )",
               "rule": "axm.exists-elim",
-              "cites": [
-                { "tag": "Line", "contents": 5 },
-                { "tag": "Range", "contents": [6, 9] }
-              ]
+              "cites": [5, [6, 9]]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( iff ( sub trm_1 x phi ) ( exists x ( and ( eq x trm_1 ) phi ) ) )",
           "rule": "axm.iff-intr",
           "cites": [
-            { "tag": "Range", "contents": [1, 4] },
-            { "tag": "Range", "contents": [5, 10] }
+            [1, 4],
+            [5, 10]
           ]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.sb6",
       "allowedSubs": { "phi": ["x"] },
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( sub trm_1 x phi )",
           "substeps": [
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "( eq a trm_1 )",
               "substeps": [
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( sub a x phi )",
                   "rule": "axm.eq-elim",
-                  "cites": [
-                    { "tag": "Line", "contents": 2 },
-                    { "tag": "Line", "contents": 1 }
-                  ]
+                  "cites": [2, 1]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( implies ( eq a trm_1 ) ( sub a x phi ) )",
               "rule": "axm.implies-intr",
-              "cites": [{ "tag": "Range", "contents": [2, 3] }]
+              "cites": [[2, 3]]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( forall x ( implies ( eq x trm_1 ) phi ) )",
               "rule": "axm.forall-intr",
-              "cites": [{ "tag": "Line", "contents": 4 }]
+              "cites": [4]
             }
           ]
         },
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( forall x ( implies ( eq x trm_1 ) phi ) )",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( implies ( eq trm_1 trm_1 ) ( sub trm_1 x phi ) )",
               "rule": "axm.forall-elim",
-              "cites": [{ "tag": "Line", "contents": 6 }]
+              "cites": [6]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( eq trm_1 trm_1 )",
               "rule": "axm.eq-intr",
               "cites": []
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( sub trm_1 x phi )",
               "rule": "axm.implies-elim",
-              "cites": [
-                { "tag": "Line", "contents": 7 },
-                { "tag": "Line", "contents": 8 }
-              ]
+              "cites": [7, 8]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( iff ( sub trm_1 x phi ) ( forall x ( implies ( eq x trm_1 ) phi ) ) )",
           "rule": "axm.iff-intr",
           "cites": [
-            { "tag": "Range", "contents": [1, 5] },
-            { "tag": "Range", "contents": [6, 9] }
+            [1, 5],
+            [6, 9]
           ]
         }
       ]
     },
     {
-      "tag": "Theorem",
+      "type": "theorem",
       "label": "thm.eu6",
       "allowedSubs": { "phi": ["x"] },
       "premises": [],
       "steps": [
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( unique x phi )",
           "substeps": [
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( exists x ( and phi ( forall y ( implies ( sub y x phi ) ( eq y x ) ) ) ) )",
               "rule": "def.unique",
-              "cites": [{ "tag": "Line", "contents": 1 }]
+              "cites": [1]
             },
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "( and ( sub a x phi ) ( forall y ( implies ( sub y x phi ) ( eq y a ) ) ) )",
               "substeps": [
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( forall y ( implies ( sub y x phi ) ( eq y a ) ) )",
                   "rule": "axm.and-elim",
-                  "cites": [{ "tag": "Line", "contents": 3 }]
+                  "cites": [3]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( implies ( sub b x phi ) ( eq b a ) )",
                   "rule": "axm.forall-elim",
-                  "cites": [{ "tag": "Line", "contents": 4 }]
+                  "cites": [4]
                 },
                 {
-                  "tag": "Subproof",
+                  "type": "subproof",
                   "assumption": "( sub b x phi )",
                   "substeps": [
                     {
-                      "tag": "ProofStep",
+                      "type": "step",
                       "expression": "( eq b a )",
                       "rule": "axm.implies-elim",
-                      "cites": [
-                        { "tag": "Line", "contents": 5 },
-                        { "tag": "Line", "contents": 6 }
-                      ]
+                      "cites": [5, 6]
                     }
                   ]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( sub a x phi )",
                   "rule": "axm.and-elim",
-                  "cites": [{ "tag": "Line", "contents": 3 }]
+                  "cites": [3]
                 },
                 {
-                  "tag": "Subproof",
+                  "type": "subproof",
                   "assumption": "( eq b a )",
                   "substeps": [
                     {
-                      "tag": "ProofStep",
+                      "type": "step",
                       "expression": "( sub b x phi )",
                       "rule": "axm.eq-elim",
-                      "cites": [
-                        { "tag": "Line", "contents": 9 },
-                        { "tag": "Line", "contents": 8 }
-                      ]
+                      "cites": [9, 8]
                     }
                   ]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( iff ( sub b x phi ) ( eq b a ) )",
                   "rule": "axm.iff-intr",
                   "cites": [
-                    { "tag": "Range", "contents": [6, 7] },
-                    { "tag": "Range", "contents": [9, 10] }
+                    [6, 7],
+                    [9, 10]
                   ]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( forall x ( iff phi ( eq x a ) ) )",
                   "rule": "axm.forall-intr",
-                  "cites": [{ "tag": "Line", "contents": 11 }]
+                  "cites": [11]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( exists y ( forall x ( iff phi ( eq x y ) ) ) )",
                   "rule": "axm.exists-intr",
-                  "cites": [{ "tag": "Line", "contents": 12 }]
+                  "cites": [12]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( exists y ( forall x ( iff phi ( eq x y ) ) ) )",
               "rule": "axm.exists-elim",
-              "cites": [
-                { "tag": "Line", "contents": 2 },
-                { "tag": "Range", "contents": [3, 13] }
-              ]
+              "cites": [2, [3, 13]]
             }
           ]
         },
         {
-          "tag": "Subproof",
+          "type": "subproof",
           "assumption": "( exists y ( forall x ( iff phi ( eq x y ) ) ) )",
           "substeps": [
             {
-              "tag": "Subproof",
+              "type": "subproof",
               "assumption": "( forall x ( iff phi ( eq x a ) ) )",
               "substeps": [
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( iff ( sub a x phi ) ( eq a a ) )",
                   "rule": "axm.forall-elim",
-                  "cites": [{ "tag": "Line", "contents": 16 }]
+                  "cites": [16]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( eq a a )",
                   "rule": "axm.eq-intr",
                   "cites": []
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( sub a x phi )",
                   "rule": "axm.iff-elim",
-                  "cites": [
-                    { "tag": "Line", "contents": 17 },
-                    { "tag": "Line", "contents": 18 }
-                  ]
+                  "cites": [17, 18]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( iff ( sub b x phi ) ( eq b a ) )",
                   "rule": "axm.forall-elim",
-                  "cites": [{ "tag": "Line", "contents": 16 }]
+                  "cites": [16]
                 },
                 {
-                  "tag": "Subproof",
+                  "type": "subproof",
                   "assumption": "( sub b x phi )",
                   "substeps": [
                     {
-                      "tag": "ProofStep",
+                      "type": "step",
                       "expression": "( eq b a )",
                       "rule": "axm.iff-elim",
-                      "cites": [
-                        { "tag": "Line", "contents": 20 },
-                        { "tag": "Line", "contents": 21 }
-                      ]
+                      "cites": [20, 21]
                     }
                   ]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( implies ( sub b x phi ) ( eq b a ) )",
                   "rule": "axm.implies-intr",
-                  "cites": [{ "tag": "Range", "contents": [21, 22] }]
+                  "cites": [[21, 22]]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( forall y ( implies ( sub y x phi ) ( eq y a ) ) )",
                   "rule": "axm.forall-intr",
-                  "cites": [{ "tag": "Line", "contents": 23 }]
+                  "cites": [23]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( and ( sub a x phi ) ( forall y ( implies ( sub y x phi ) ( eq y a ) ) ) )",
                   "rule": "axm.and-intr",
-                  "cites": [
-                    { "tag": "Line", "contents": 19 },
-                    { "tag": "Line", "contents": 24 }
-                  ]
+                  "cites": [19, 24]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( exists x ( and phi ( forall y ( implies ( sub y x phi ) ( eq y x ) ) ) ) )",
                   "rule": "axm.exists-intr",
-                  "cites": [{ "tag": "Line", "contents": 25 }]
+                  "cites": [25]
                 },
                 {
-                  "tag": "ProofStep",
+                  "type": "step",
                   "expression": "( unique x phi )",
                   "rule": "def.unique",
-                  "cites": [{ "tag": "Line", "contents": 26 }]
+                  "cites": [26]
                 }
               ]
             },
             {
-              "tag": "ProofStep",
+              "type": "step",
               "expression": "( unique x phi )",
               "rule": "axm.exists-elim",
-              "cites": [
-                { "tag": "Line", "contents": 15 },
-                { "tag": "Range", "contents": [16, 27] }
-              ]
+              "cites": [15, [16, 27]]
             }
           ]
         },
         {
-          "tag": "ProofStep",
+          "type": "step",
           "expression": "( iff ( unique x phi ) ( exists y ( forall x ( iff phi ( eq x y ) ) ) ) )",
           "rule": "axm.iff-intr",
           "cites": [
-            { "tag": "Range", "contents": [1, 14] },
-            { "tag": "Range", "contents": [15, 28] }
+            [1, 14],
+            [15, 28]
           ]
         }
       ]

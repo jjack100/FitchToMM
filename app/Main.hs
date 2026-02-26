@@ -20,7 +20,7 @@ import FitchToMM.MMProof
 import FitchToMM.Parser (SymbolType)
 import FitchToMM.Pretty
 import FitchToMM.ProofWriter
-import qualified FitchToMM.Schema as Schema
+import qualified FitchToMM.Serialize as S
 import Paths_fitch_to_mm
 import Prettyprinter
 import Prettyprinter.Render.Text
@@ -36,7 +36,7 @@ main = do
   let inputFile = cmdInputFile cmd
   content <- BL.readFile inputFile
   collection <- either (errorOut . T.pack) pure $ eitherDecode content
-  parsedCollection <- either errorOut pure $ Schema.parseCollection base collection
+  parsedCollection <- either errorOut pure $ S.parseCollection base collection
   case cmd of
     (GenOptions _ outputFile format) ->
       genDatabase
