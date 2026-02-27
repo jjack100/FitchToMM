@@ -218,20 +218,18 @@ proveReplWff allowed ph y (WffSub (TrmVar y') x ph') (TrmVar x')
 proveReplWff _ _ _ _ _ = W.lift $ Left Inapplicable
 
 proveReplLst :: AllowedSubs -> [Term] -> Var -> [Term] -> Term -> ProofWriter
-proveReplLst allowed lst1 x lst2 t3 =
-  let proveItems [t1] [t2] = proveReplTrm allowed t1 x t2 t3
-      proveItems (t1 : ts) (t2 : us) = do
-        xPrf <- proveVar x
-        t1Prf <- proveTrm t1
-        t2Prf <- proveTrm t2
-        t3Prf <- proveTrm t3
-        tsPrf <- provePrependLst ts
-        usPrf <- provePrependLst us
-        rPrf1 <- proveReplTrm allowed t1 x t2 t3
-        rPrf2 <- proveItems ts us
-        proveMMStep "sub.lst" [xPrf, t1Prf, t2Prf, t3Prf, tsPrf, usPrf, rPrf1, rPrf2]
-      proveItems _ _ = W.lift $ Left EmptyList
-   in proveItems (reverse lst1) (reverse lst2)
+proveReplLst allowed [t1] x [t2] t3 = proveReplTrm allowed t1 x t2 t3
+proveReplLst allowed (t : vs) x (u : ws) t1 = do
+    xPrf <- proveVar x
+    t1Prf <- proveTrm t1
+    tsPrf <- proveLst [t]
+    usPrf <- proveLst [u]
+    vsPrf <- proveLst vs
+    wsPrf <- proveLst ws
+    rPrf1 <- proveReplLst allowed [t] x [u] t1
+    rPrf2 <- proveReplLst allowed vs x ws t1
+    proveMMStep "sub.lst" [xPrf, t1Prf, tsPrf, usPrf, vsPrf, wsPrf, rPrf1, rPrf2]
+proveReplLst _ _ _ _ _ = W.lift $ Left EmptyList
 
 proveReplTrm :: AllowedSubs -> Term -> Var -> Term -> Term -> ProofWriter
 -- Replacing a single variable with a term just yields that term

@@ -30,7 +30,7 @@ import qualified Data.Text as T
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 
-data Expression = ExprWff Wff | ExprTrm Term | ExprVar T.Text | ExprCtx [Wff]
+data Expression = ExprWff Wff | ExprTrm Term | ExprVar T.Text | ExprCtx Context
   deriving (Show, Eq, Ord)
 
 newtype Substitution = Substitution (M.Map T.Text Expression)
@@ -114,7 +114,7 @@ singletonTrm x trm = Substitution $ M.singleton x (ExprTrm trm)
 singletonVar :: T.Text -> T.Text -> Substitution
 singletonVar x var = Substitution $ M.singleton x (ExprVar var)
 
-singletonCtx :: [Wff] -> Substitution
+singletonCtx :: Context -> Substitution
 singletonCtx ctx = Substitution $ M.singleton "..." (ExprCtx ctx)
 
 lookupWff :: T.Text -> Substitution -> Maybe Wff
@@ -132,7 +132,7 @@ lookupVar metavar (Substitution u)
   | Just (ExprVar var) <- M.lookup metavar u = Just var
   | otherwise = Nothing
 
-lookupCtx :: T.Text -> Substitution -> Maybe [Wff]
+lookupCtx :: T.Text -> Substitution -> Maybe Context
 lookupCtx metavar (Substitution u)
   | Just (ExprCtx ctx) <- M.lookup metavar u = Just ctx
   | otherwise = Nothing
@@ -144,8 +144,9 @@ varsIn (ExprTrm trm) = varsInTrm trm
 varsIn (ExprVar var) = S.singleton $ VarHyp var
 varsIn (ExprCtx ctx) = varsInCtx ctx
 
-varsInCtx :: [Wff] -> S.Set FHyp
-varsInCtx ctx = S.insert (CtxHyp "...") (foldMap' varsInWff ctx)
+varsInCtx :: Context -> S.Set FHyp
+varsInCtx (RelContext ctx) = S.insert (CtxHyp "...") (foldMap' varsInWff ctx)
+varsInCtx (AbsContext ctx) = foldMap' varsInWff ctx
 
 varsInWff :: Wff -> S.Set FHyp
 varsInWff (WffBinOp _ lhs rhs) = varsInWff lhs <> varsInWff rhs

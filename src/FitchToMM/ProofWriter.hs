@@ -1,5 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module FitchToMM.ProofWriter
@@ -12,6 +13,7 @@ module FitchToMM.ProofWriter
     Label,
     DVR (..),
     PropWriter,
+    Context(..),
     proveMetavar,
     proveVar,
     proveStep,
@@ -38,6 +40,9 @@ module FitchToMM.ProofWriter
     isSetvar,
     isMetavar,
     isCtx,
+    unconsCtx,
+    nullCtx,
+    assume,
   )
 where
 
@@ -49,6 +54,7 @@ import Data.Maybe
 import Data.Semigroup.Generic
 import qualified Data.Set as S
 import qualified Data.Text as T
+import FitchToMM.Parser (Wff)
 import GHC.Generics
 
 -- Helper Monad to build the RPN stack while tracking properties about the proof
@@ -72,6 +78,11 @@ data StackEntry = StackEntry Bool RpnStep | Unknown
 
 data RpnStep = RpnStep Int Label
   deriving (Show)
+
+data Context
+  = AbsContext {ctxWffs :: [Wff]}
+  | RelContext {ctxWffs :: [Wff]}
+  deriving (Show, Eq, Ord)
 
 type Label = T.Text
 
@@ -215,7 +226,7 @@ getSteps thmLabel (RpnStack dlist) =
 
 preDeclaredVars :: [FHyp]
 preDeclaredVars =
-  [CtxHyp "..."]
+  map CtxHyp ["...", "..._1", "..._2"]
     ++ map WffHyp ["phi", "psi", "chi", "phi_1", "psi_1", "chi_1", "phi_2", "psi_2", "chi_2"]
     ++ map (VarHyp . T.singleton) ['a' .. 'z']
     ++ map TrmHyp ["trm_1", "trm_2", "trm_3", "trm_4", "trm_5"]
@@ -226,3 +237,17 @@ sortVars = sortOn $ \x -> (pos x, x)
   where
     pos x = fromMaybe end (elemIndex x preDeclaredVars)
     end = length preDeclaredVars
+
+unconsCtx :: Context -> Maybe (Wff, Context)
+unconsCtx (AbsContext []) = Nothing
+unconsCtx (AbsContext (wff : rest)) = Just (wff, AbsContext rest)
+unconsCtx (RelContext []) = Nothing
+unconsCtx (RelContext (wff : rest)) = Just (wff, RelContext rest)
+
+nullCtx :: Context -> Bool
+nullCtx = null . ctxWffs
+
+-- Push a new assumption to the context stack
+assume :: Context -> Wff -> Context
+assume (RelContext ctx) assumption = RelContext $ assumption : ctx
+assume (AbsContext ctx) assumption = AbsContext $ assumption : ctx

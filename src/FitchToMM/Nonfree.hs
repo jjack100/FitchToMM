@@ -11,7 +11,6 @@ where
 import qualified Control.Monad.Writer.Strict as W
 import qualified Data.Text as T
 import FitchToMM.Declarations
-import FitchToMM.FitchProof (Context)
 import FitchToMM.Matcher
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
@@ -20,19 +19,20 @@ import FitchToMM.SyntaxProver
 proveNfCtx :: AllowedSubs -> T.Text -> Context -> ProofWriter
 proveNfCtx allowed x ctx
   -- A variable that does not occur is not free
-  | not $ any (occursInWff allowed x) ctx = do
+  | not $ occursInCtx allowed x ctx = do
       reqDisjointFor (VarHyp x) (varsInCtx ctx)
       ctxPrf <- proveCtx ctx
       xPrf <- proveVar x
       proveMMStep "nf.ctx-none" [ctxPrf, xPrf]
-proveNfCtx allowed x (ph : ctx) = do
-  ctxPrf <- proveCtx ctx
-  phPrf <- proveWff ph
-  xPrf <- proveVar x
-  nfPrf1 <- proveNfCtx allowed x ctx
-  nfPrf2 <- proveNfWff allowed x ph
-  proveMMStep "nf.ctx" [ctxPrf, phPrf, xPrf, nfPrf1, nfPrf2]
-proveNfCtx _ _ _ = W.lift $ Left Inapplicable
+proveNfCtx allowed x ctx = case unconsCtx ctx of
+  Just (ph, ctx1) -> do
+    ctx1Prf <- proveCtx ctx1
+    ctx2Prf <- proveCtx $ AbsContext [ph]
+    xPrf <- proveVar x
+    nfPrf1 <- proveNfCtx allowed x ctx1
+    nfPrf2 <- proveNfWff allowed x ph
+    proveMMStep "nf.ctx" [ctx1Prf, ctx2Prf, xPrf, nfPrf1, nfPrf2]
+  Nothing -> W.lift $ Left Inapplicable
 
 proveNfWff :: AllowedSubs -> T.Text -> Wff -> ProofWriter
 -- A variable that does not occur is not free
@@ -109,17 +109,15 @@ proveNfLst allowed x l
       xPrf <- proveVar x
       tsPrf <- proveLst l
       proveMMStep "nf.lst-none" [xPrf, tsPrf]
-proveNfLst allowed x l =
-  let proveItems [t] = proveNfTrm allowed x t
-      proveItems (t : ts) = do
-        xPrf <- proveVar x
-        tPrf <- proveTrm t
-        tsPrf <- provePrependLst ts
-        nfPrf1 <- proveNfTrm allowed x t
-        nfPrf2 <- proveItems ts
-        proveMMStep "nf.lst" [xPrf, tPrf, tsPrf, nfPrf1, nfPrf2]
-      proveItems [] = W.lift $ Left $ EmptyList
-   in proveItems $ reverse l
+proveNfLst allowed x [t] = proveNfTrm allowed x t
+proveNfLst allowed x (t : us) = do
+  xPrf <- proveVar x
+  tsPrf <- proveLst [t]
+  usPrf <- proveLst us
+  nfPrf1 <- proveNfLst allowed x [t]
+  nfPrf2 <- proveNfLst allowed x us
+  proveMMStep "nf.lst" [xPrf, tsPrf, usPrf, nfPrf1, nfPrf2]
+proveNfLst _ _ [] = W.lift $ Left $ EmptyList
 
 proveNfTrm :: AllowedSubs -> T.Text -> Term -> ProofWriter
 -- A variable that does not occur is not free

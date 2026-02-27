@@ -101,7 +101,7 @@ shouldBeNonfree baseTxt allowed var wff =
 
 shouldBeNonfreeCtx :: T.Text -> AllowedSubs -> T.Text -> [T.Text] -> Expectation
 shouldBeNonfreeCtx baseTxt allowed var wffs =
-  let ctx = reverse $ map expr wffs
+  let ctx = RelContext $ reverse $ map expr wffs
       result = proveNfCtx allowed var ctx
       ctxTxt = "... " <> T.unwords wffs
       stmt = "; NONFREE " <> var <> " " <> ctxTxt

@@ -31,8 +31,10 @@ $c wff ctx stmt $.
 
 $( We use an ellipsis as a metavariable to range over a list of WFFs (that form
    an assumption context) $)
-$v ... $.
-ctx.ellipsis  $f ctx ... $.
+$v ... ..._1 ..._2 $.
+ctx.ellipsis    $f ctx ... $.
+ctx.ellipsis_1  $f ctx ..._1 $.
+ctx.ellipsis_2  $f ctx ..._2 $.
 
 $( Metavariables used to represent WFFs $)
 $v phi psi chi phi_1 psi_1 chi_1 phi_2 psi_2 chi_2 $.
@@ -46,9 +48,19 @@ wff.phi_2 $f wff phi_2 $.
 wff.psi_2 $f wff psi_2 $.
 wff.chi_2 $f wff chi_2 $.
 
-$( Recursively define a context $)
-ctx.empty $a ctx $. $( Base case is the empty context $)
-ctx.append $a ctx ... phi $. $( Recursive case: a context followed by a WFF $)
+$( Define syntax for contexts $)
+
+$( A context list may be empty $)
+ctx.empty $a ctx $. 
+$( A context list may contain a single WFF $)
+ctx.singleton $a ctx phi $.
+$( Two context lists may be concatenated to form a new list $)
+ctx.concat $a ctx ..._1 ..._2 $.
+
+$( We can now construct lists by appending WFFs $)
+ctx.append $p ctx ... phi $= ( ctx.singleton ctx.concat ) ABCD $.
+$( And we can now construct lists by prepending WFFs $)
+ctx.prepend $p ctx phi ... $= ( ctx.singleton ctx.concat ) BCAD $.
 
 $( Syntax for judgements $)
 stmt.jdg $a stmt ... |- phi $.
@@ -77,31 +89,37 @@ Introduction Rules
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 $)
 
-${ $( Conjunction Introduction $)
+${
   axm.and-intr.1 $e ; ... |- phi $.
   axm.and-intr.2 $e ; ... |- psi $.
+  $( Conjunction Introduction $)
   axm.and-intr   $a ; ... |- ( and phi psi ) $.
 $}
 
-${ $( Disjunction Introduction $)
+${
   axm.or-intr.1 $e ; ... |- phi $.
+  $( Disjunction Introduction (left side) $)
   axm.or-intr-1 $a ; ... |- ( or phi psi ) $.
+  $( Disjunction Introduction (right side) $)
   axm.or-intr-2 $a ; ... |- ( or psi phi ) $.
 $}
 
-${ $( Implication Introduction $)
+${
   axm.implies-intr.1 $e ; ... phi |- psi $.
+  $( Implication Introduction $)
   axm.implies-intr   $a ; ... |- ( implies phi psi ) $.
 $}
 
-${ $( Biconditional Introduction $)
+${
   axm.iff-intr.1 $e ; ... phi |- psi $.
   axm.iff-intr.2 $e ; ... psi |- phi $.
+  $( Biconditional Introduction $)
   axm.iff-intr   $a ; ... |- ( iff phi psi ) $.
 $}
 
-${ $( Negation Introduction $)
+${
   axm.not-intr.1 $e ; ... phi |- false $.
+  $( Negation Introduction $)
   axm.not-intr   $a ; ... |- ( not phi ) $.
 $}
 
@@ -114,43 +132,53 @@ Elimination Rules
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 $)
 
-${ $( Conjunction Elimination $)
+${
   axm.and-elim.1 $e ; ... |- ( and phi psi ) $.
+  $( Conjunction Elimination (left side) $)
   axm.and-elim-1 $a ; ... |- phi $.
+  $( Conjunction Elimination (right side) $)
   axm.and-elim-2 $a ; ... |- psi $.
 $}
 
-${ $( Disjunction Elimination $)
+${
   axm.or-elim.1 $e ; ... |- ( or phi psi ) $.
   axm.or-elim.2 $e ; ... phi |- chi $.
   axm.or-elim.3 $e ; ... psi |- chi $.
+  $( Disjunction Elimination $)
   axm.or-elim   $a ; ... |- chi $.
 $}
 
-${ $( Implication Elimination $)
+${
   axm.implies-elim.1 $e ; ... |- ( implies phi psi ) $.
   axm.implies-elim.2 $e ; ... |- phi $.
+  $( Implication Elimination $)
   axm.implies-elim   $a ; ... |- psi $.
 $}
 
-${ $( Biconditional Elimination $)
+${
   axm.iff-elim-1.1 $e ; ... |- ( iff phi psi ) $.
   axm.iff-elim-1.2 $e ; ... |- phi $.
+  $( Biconditional Elimination (rightwards direction) $)
   axm.iff-elim-1   $a ; ... |- psi $.
-$} ${
+$}
+
+${
   axm.iff-elim-2.1 $e ; ... |- ( iff phi psi ) $.
   axm.iff-elim-2.2 $e ; ... |- psi $.
+  $( Biconditional Elimination (leftwards direction) $)
   axm.iff-elim-2   $a ; ... |- phi $.
 $}
 
-${ $( Negation Elimination $)
+${
   axm.not-elim.1 $e ; ... |- phi $.
   axm.not-elim.2 $e ; ... |- ( not phi ) $.
+  $( Negation Elimination $)
   axm.not-elim   $a ; ... |- false $.
 $}
 
-${ $( Falsum Elimination $)
+${
   axm.false-elim.1 $e ; ... |- false $.
+  $( Falsum Elimination $)
   axm.false-elim   $a ; ... |- phi $.
 $}
 
@@ -186,9 +214,9 @@ ${
 $}
 
 $(
---------------------------------------------------------------------------------
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*
 Predicate Logic
---------------------------------------------------------------------------------
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*
 $)
 
 $( Introduce some new grammatical types:
@@ -244,13 +272,34 @@ trm.trm_3 $f trm trm_3 $.
 trm.trm_4 $f trm trm_4 $.
 trm.trm_5 $f trm trm_5 $.
 
-$v ..t ..u $.
+$v ..t ..u ..v ..w $.
 lst.t $f lst ..t $.
 lst.u $f lst ..u $.
+lst.v $f lst ..v $.
+lst.w $f lst ..w $.
 
-$( Recursively define a list of terms $)
-lst.single $a lst trm_1 $.
-lst.append $a lst ..t trm_1 $.
+$( Recursively define the syntax for a list of terms
+
+   These will be used for listing the arguments of functions and predicates.
+   Unlike lists of WFFs used for assumption contexts, we do not need to
+   consider the case where argument lists are empty.
+
+   This is because the special case where a function has no arguments can be
+   seen as just a constant (and we can introduce constants simply by giving
+   a symbol the grammatical type of a term).
+
+   Likewise the special case where a predicate has no arguments can be seen as
+   a propositional constant, of which there are only two possibilities: always
+   true or always false. These are already expressed by the logical primitives
+   verum and falsum. $)
+
+$( A list may contain a single term $)
+lst.singleton $a lst trm_1 $.
+$( Two lists may be concatenated to form a new list $)
+lst.concat $a lst ..t ..u $.
+
+lst.append $p lst ..t trm_1 $= ( lst.singleton lst.concat ) BACD $.
+lst.prepend $p lst trm_1 ..t $= ( lst.singleton lst.concat ) ACBD $.
 
 $( A predicate symbol followed by its arguments is a WFF.
 
@@ -337,7 +386,7 @@ ${
   $d x trm_1 $.
   $( A variable that does not occur in a term is not free $)
   nf.trm-none $p ; NONFREE x trm_1 $=
-    ( lst.single nf.lst-none ) ABCD $.
+    ( lst.singleton nf.lst-none ) ABCD $.
 $}
 
 ${
@@ -365,10 +414,10 @@ ${
 $}
 
 ${
-  nf.lst.1 $e ; NONFREE x trm_1 $.
-  nf.lst.2 $e ; NONFREE x ..t $.
+  nf.lst.1 $e ; NONFREE x ..t $.
+  nf.lst.2 $e ; NONFREE x ..u $.
   $( Nonfreeness for lists of terms $)
-  nf.lst   $a ; NONFREE x ..t trm_1 $.
+  nf.lst   $a ; NONFREE x ..t ..u $.
 $}
 
 $(
@@ -441,10 +490,10 @@ ${
 $}
 
 ${ 
-  nf.ctx.1 $e ; NONFREE x ... $.
-  nf.ctx.2 $e ; NONFREE x phi $.
+  nf.ctx.1 $e ; NONFREE x ..._1 $.
+  nf.ctx.2 $e ; NONFREE x ..._2 $.
   $( Nonfreeness for lists of WFFs $)
-  nf.ctx   $a ; NONFREE x ... phi $.
+  nf.ctx   $a ; NONFREE x ..._1 ..._2 $.
 $}
 
 $(
@@ -462,23 +511,23 @@ sub.trm-rep $a ; trm_1 REPLACES x IN x WITH trm_1 $.
 ${
   sub.trm-none.1 $e ; NONFREE x trm_1 $.
   $( Nothing is replaced in a term when there are no free occurrences $)
-  sub.trm-none $a ; trm_1 REPLACES x IN trm_1 WITH trm_2 $.
+  sub.trm-none   $a ; trm_1 REPLACES x IN trm_1 WITH trm_2 $.
 $}
 
 $( Replacing a variable with itself has no effect $)
 sub.trm-id $a ; trm_1 REPLACES x IN trm_1 WITH x $.
 
 ${
-  sub.lst.1 $e ; trm_1     REPLACES x IN     trm_2 WITH trm_3 $.
-  sub.lst.2 $e ; ..t       REPLACES x IN ..u       WITH trm_3 $.
+  sub.lst.1 $e ; ..t REPLACES x IN ..u WITH trm_1 $.
+  sub.lst.2 $e ; ..v REPLACES x IN ..w WITH trm_1 $.
   $( Recursively handle replacement for lists of terms $)
-  sub.lst   $a ; ..t trm_1 REPLACES x IN ..u trm_2 WITH trm_3 $.
+  sub.lst   $a ; ..t ..v REPLACES x IN ..u ..w WITH trm_1 $.
 $}
 
 ${ 
   sub.trm-func.1 $e ; ..t REPLACES x IN ..u WITH trm_1 $.
   $( A function replaces if all its arguments do $)
-  sub.trm-func  $a ; ( func_1 ..t ) REPLACES x IN ( func_1 ..u ) WITH trm_1 $.
+  sub.trm-func   $a ; ( func_1 ..t ) REPLACES x IN ( func_1 ..u ) WITH trm_1 $.
 $}
 
 ${
@@ -662,11 +711,11 @@ ${
   $( The reverse direction of equality elimination is in fact derivable as a
      theorem in our system, but in Fitch-style proofs we will permit using
      "axm.eq-elim" to refer to either one. $)
-  thm.eq-elim-2   $p ; ... |- phi $=
-    ( lst.single wff.atm sub.trm-none sub.trm-rep sub.lst sub.wff-prd prd.eq
-    lst.append axm.eq-elim-1 trm.var nf.lst-none axm.eq-intr ) ACBDEGFIHARFFLZSZ
-    MRFGLZSZMRFEUALZSZMEFGERFUEUIEFFFUDUHEFFEUDUBZNEFOPQERGUGUIEFFGUFUHEFGUJNEGO
-    PQJAFUCTKT $.
+  thm.eq-elim-2   $p ; ... |- phi $= 
+    ( prd.eq lst.singleton lst.concat wff.atm sub.trm-rep sub.wff-prd
+    sub.trm-none sub.lst axm.eq-elim-1 nf.lst-none axm.eq-intr trm.var ) ACBDEGF
+    IHALFMZUDNZOLGMZUDNZOLEUCMZUDNZOEFGELFUEUIEFUDUHUDUDEFPEFFEUDUAZRSQELGUGUIEG
+    UFUHUDUDEGPEFGUJRSQJAFUBTKT $.
 $}
 
 $(
@@ -709,7 +758,7 @@ ${
   def.sub-trm   $a ; ( eq trm_1 ( sub trm_4 x trm_3 ) ) := ( eq trm_1 trm_2 ) $.
 $}
 
-$( We we also require special rules for substitution to allow rules that have
+$( We will also require special rules for substitution to allow rules that have
    replacement hypotheses to recognize when the substitution operator may be
    introduced or eliminated. $)
 

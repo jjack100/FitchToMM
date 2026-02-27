@@ -12,13 +12,13 @@ module FitchToMM.SyntaxProver
     constStep,
     occursInWff,
     occursInTrm,
+    occursInCtx,
   )
 where
 
 import Control.Monad.Writer.Strict
 import qualified Data.Text as T
 import FitchToMM.Declarations (AllowedSubs)
-import FitchToMM.FitchProof (Context)
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 
@@ -59,15 +59,20 @@ proveWff (WffSub t x ph) = do
   tPrf <- proveTrm t
   proveMMStep "wff.sub" [phPrf, xPrf, tPrf]
 
--- Our Metamath database expects a list to be built by appending rather than
--- prepending, so we must reverse the items first
 proveLst :: [Term] -> ProofWriter
-proveLst = provePrependLst . reverse
+proveLst [term] = do
+  trmPrf <- proveTrm term
+  proveMMStep "lst.singleton" [trmPrf]
+proveLst (term : terms) = do
+  trmPrf <- proveTrm term
+  lstPrf <- proveLst terms
+  proveMMStep "lst.prepend" [trmPrf, lstPrf]
+proveLst _ = lift $ Left EmptyList
 
 provePrependLst :: [Term] -> ProofWriter
 provePrependLst [term] = do
   trmPrf <- proveTrm term
-  proveMMStep "lst.single" [trmPrf]
+  proveMMStep "lst.singleton" [trmPrf]
 provePrependLst (term : terms) = do
   trmPrf <- proveTrm term
   lstPrf <- provePrependLst terms
@@ -91,11 +96,22 @@ proveTrm (TrmSub t1 x t2) = do
   proveMMStep "trm.sub" [xPrf, t1Prf, t2Prf]
 
 proveCtx :: Context -> ProofWriter
-proveCtx [] = proveEllipsis
-proveCtx (phi : rest) = do
-  ctxPrf <- proveCtx rest
-  wffPrf <- proveWff phi
-  proveMMStep "ctx.append" [ctxPrf, wffPrf]
+proveCtx (RelContext []) = proveEllipsis
+proveCtx (AbsContext []) = proveMMStep "ctx.empty" []
+proveCtx (AbsContext [ph]) = do
+  phPrf <- proveWff ph
+  proveMMStep "ctx.singleton" [phPrf]
+proveCtx (RelContext (ph : ctx)) = proveCtxAppend RelContext ctx ph
+proveCtx (AbsContext (ph : ctx)) = proveCtxAppend AbsContext ctx ph
+
+proveCtxAppend :: ([Wff] -> Context) -> [Wff] -> Wff -> ProofWriter
+proveCtxAppend toCtx wffs phi = do
+  ctxPrf <- proveCtx $ toCtx wffs
+  phPrf <- proveWff phi
+  proveMMStep "ctx.append" [ctxPrf, phPrf]
+
+occursInCtx :: AllowedSubs -> T.Text -> Context -> Bool
+occursInCtx a x ctx = any (occursInWff a x) (ctxWffs ctx)
 
 occursInWff :: AllowedSubs -> T.Text -> Wff -> Bool
 occursInWff a x (WffBinOp _ lhs rhs) = occursInWff a x lhs || occursInWff a x rhs

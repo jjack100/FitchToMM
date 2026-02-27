@@ -87,17 +87,19 @@ fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = d
     -- The proof should not end with any undischarged assumptions
     step i (FlatStep ctx _ _ _ _)
       | i + 1 == V.length flatProof,
-        not $ null ctx =
+        not $ nullCtx ctx =
           lift $ Left LeftUndischarged
     -- Handle premises
     step _ (FlatStep _ _ (Premise num) _ _) =
       proveLocalStep $ RpnStep 0 (T.show $ num + 1)
     -- Handle assumptions
-    step _ (FlatStep (assump : ctx) wff Assumption _ _) | assump == wff = do
-      ctxPrf <- proveCtx ctx
-      wffPrf <- proveWff wff
-      assumePrf <- proveStep $ RpnStep 2 "axm.assume"
-      return $ ctxPrf <> wffPrf <> assumePrf
+    step _ (FlatStep ctx wff Assumption _ _)
+      | Just (assump, rest) <- unconsCtx ctx,
+        assump == wff = do
+          ctxPrf <- proveCtx rest
+          wffPrf <- proveWff wff
+          assumePrf <- proveStep $ RpnStep 2 "axm.assume"
+          return $ ctxPrf <> wffPrf <> assumePrf
     step _ (FlatStep _ _ Assumption _ _) = lift $ Left BadAssumption
     -- Handle reiteration
     step i (FlatStep ctx expr Reiteration [citation] _)
@@ -393,14 +395,15 @@ proveFHyp _ hyp = proveMetavar $ markInternal hyp
 proveThin :: Context -> FlatStep -> RpnStack -> ProofWriter
 proveThin toCtx (FlatStep fromCtx _ _ _ _) basePrf
   | fromCtx == toCtx = pure basePrf
-proveThin (psi : ctx) stp@(FlatStep _ phi _ _ _) basePrf = do
-  ctxPrf <- proveCtx ctx
-  phiPrf <- proveWff phi
-  psiPrf <- proveWff psi
-  prev <- proveThin ctx stp basePrf
-  thinPrf <- proveStep $ RpnStep 4 "axm.thin"
-  return $ ctxPrf <> phiPrf <> psiPrf <> prev <> thinPrf
-proveThin _ _ _ = lift $ Left Inapplicable
+proveThin ctx stp@(FlatStep _ phi _ _ _) basePrf = case unconsCtx ctx of
+  Just (psi, rest) -> do
+    ctxPrf <- proveCtx rest
+    phiPrf <- proveWff phi
+    psiPrf <- proveWff psi
+    prev <- proveThin rest stp basePrf
+    thinPrf <- proveStep $ RpnStep 4 "axm.thin"
+    return $ ctxPrf <> phiPrf <> psiPrf <> prev <> thinPrf
+  Nothing -> lift $ Left Inapplicable
 
 -- Check that a cited step matches an essential hypothesis, and if so return the substitution
 verifyEHyp :: FlatStep -> Condition -> Maybe Substitution
@@ -408,12 +411,14 @@ verifyEHyp (FlatStep ctx wff _ _ _) (Condition Nothing hyp) = do
   let ctxSub = singletonCtx ctx
   hypSub <- wff `matchTo` hyp
   merge ctxSub hypSub
-verifyEHyp (FlatStep (assump : ctx) wff _ _ _) (Condition (Just sup) hyp) = do
-  let ctxSub = singletonCtx ctx
-  supSub <- assump `matchTo` sup
-  hypSub <- wff `matchTo` hyp
-  mergeFold [ctxSub, supSub, hypSub]
-verifyEHyp _ _ = Nothing
+verifyEHyp (FlatStep ctx wff _ _ _) (Condition (Just sup) hyp) =
+  case unconsCtx ctx of
+    Just (assump, rest) -> do
+      let ctxSub = singletonCtx rest
+      supSub <- assump `matchTo` sup
+      hypSub <- wff `matchTo` hyp
+      mergeFold [ctxSub, supSub, hypSub]
+    Nothing -> Nothing
 
 varsInCond :: Condition -> S.Set FHyp
 varsInCond (Condition (Just sup) hyp) = varsInWff sup <> varsInWff hyp

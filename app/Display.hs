@@ -22,6 +22,7 @@ import Prettyprinter
 import Prettyprinter.Render.Text
 import System.Console.ANSI
 import Text.Regex.TDFA
+import FitchToMM.ProofWriter (Context(..))
 
 -- Display a flattened proof in sequent-style
 prettyFlat :: Bool -> T.Text -> AllowedSubs -> [FlatStep] -> T.Text
@@ -40,7 +41,8 @@ prettyFlat asSExpr name allowedSubs steps =
     -- Print line numbers
     nums = map T.show [1 .. length steps]
     -- Print context
-    printCtx ctx = T.intercalate ", " $ "Γ" : map render (reverse ctx)
+    printCtx (AbsContext ctx) = T.intercalate ", " $ map render (reverse ctx)
+    printCtx (RelContext ctx) = T.intercalate ", " $ "Γ" : map render (reverse ctx)
     ctxs = map (\(FlatStep ctx _ _ _ _) -> printCtx ctx) steps
     -- Print the expression
     wffs = map (\(FlatStep _ wff _ _ _) -> render wff) steps
