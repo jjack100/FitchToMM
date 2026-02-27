@@ -393,17 +393,19 @@ proveFHyp _ hyp = proveMetavar $ markInternal hyp
 
 -- Tries to thin a step to match a given context
 proveThin :: Context -> FlatStep -> RpnStack -> ProofWriter
-proveThin toCtx (FlatStep fromCtx _ _ _ _) basePrf
-  | fromCtx == toCtx = pure basePrf
-proveThin ctx stp@(FlatStep _ phi _ _ _) basePrf = case unconsCtx ctx of
-  Just (psi, rest) -> do
-    ctxPrf <- proveCtx rest
-    phiPrf <- proveWff phi
-    psiPrf <- proveWff psi
-    prev <- proveThin rest stp basePrf
-    thinPrf <- proveStep $ RpnStep 4 "axm.thin"
-    return $ ctxPrf <> phiPrf <> psiPrf <> prev <> thinPrf
+proveThin toCtx (FlatStep fromCtx ps _ _ _) basePrf = case extras fromCtx toCtx of
+  Just [] -> pure basePrf
+  Just extraAssumptions -> do
+    ctx1Prf <- proveCtx fromCtx
+    ctx2Prf <- proveCtx $ AbsContext extraAssumptions
+    psPrf <- proveWff ps
+    proveMMStep "axm.thin" [ctx1Prf, ctx2Prf, psPrf, basePrf]
   Nothing -> lift $ Left Inapplicable
+  where
+    extras (RelContext from) (RelContext to) = stripSuffix from to
+    extras (AbsContext from) (AbsContext to) = stripSuffix from to
+    extras _ _ = Nothing
+    stripSuffix x y = reverse <$> stripPrefix (reverse x) (reverse y)
 
 -- Check that a cited step matches an essential hypothesis, and if so return the substitution
 verifyEHyp :: FlatStep -> Condition -> Maybe Substitution

@@ -188,7 +188,6 @@ Other Rules
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 $)
 
-
 ${
   axm.ip.1 $e ; ... ( not phi ) |- false $.
   $( Indirect Proof:
@@ -204,13 +203,13 @@ axm.assume $a ; ... phi |- phi $.
 
 
 ${
-  axm.thin.1 $e ; ... |- phi $.
+  axm.thin.1 $e ; ..._1 |- phi $.
   $( Thinning Rule:
      Also called "weakening". We can always add unused assumptions to our
      claims. This is needed because we are presenting natural deduction in
      sequent-style to work in Metamath, but in a Fitch-style proof this is used
      implicitly whenever a subproof uses a result from an outer proof. $)
-  axm.thin   $a ; ... psi |- phi $.
+  axm.thin   $a ; ..._1 ..._2 |- phi $.
 $}
 
 $(
