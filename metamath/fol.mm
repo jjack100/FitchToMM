@@ -801,3 +801,122 @@ ${
                                                     ( sub y x phi ) 
                                                     ( eq y x ) ) ) ) ) $.
 $}
+
+$(
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*
+Substitution of Equivalents & Rules of Replacement
+#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*#*
+
+Two formulae are considered logically equivalent if their material biconditional
+is a tautology (i.e., provable in the empty context).
+
+If two WFFs are logically equivalent, they can generally be swapped for one
+another in any arbitrary formula without affecting its truth-value. This allows
+us to express "rules of replacement" that allow us to infer a new statement by
+replacing some segments of it with logically equivalent ones.
+
+Compared to the other rules of inference, these have the advantage of being able
+to operate on not just on the whole formula but also on subformulae. This is
+useful because it can spare us from having to dis- and reassemble an entire formula
+to change only part of it.
+
+In this section we will prove some results demonstrating that for each of our
+logical operators, their interchangeability (in any context) follows from the
+logical equivalence of their subformulae.
+$)
+
+thm.eqv-id $p ; ... |- ( iff phi phi ) $=
+  ( axm.assume axm.iff-intr ) ABBABCZED $.
+
+${
+  thm.eqv-and.1 $e ; |- ( iff phi_1 phi_2 ) $.
+  thm.eqv-and.2 $e ; |- ( iff psi_1 psi_2 ) $.
+  thm.eqv-and   $p ; ... |- ( iff ( and phi_1 psi_1 ) ( and phi_2 psi_2 ) ) $= 
+    ( ctx.empty ctx.append ctx.singleton axm.thin axm.and-elim-1 axm.iff-elim-1
+    wff.and axm.assume axm.and-elim-2 axm.and-intr axm.iff-elim-2 axm.iff-intr
+    wff.iff ) HABCNZDENZTHUAUBHUAIZDEUCBDHUAJZBDTZFKUCBCHUAOZLMUCCEHUDCETZGKUCBC
+    UFPMQHUBIZBCUHBDHUBJZUEFKUHDEHUBOZLRUHCEHUIUGGKUHDEUJPRQSK $.
+$}
+
+${
+  thm.eqv-or.1 $e ; |- ( iff phi_1 phi_2 ) $.
+  thm.eqv-or.2 $e ; |- ( iff psi_1 psi_2 ) $.
+  thm.eqv-or   $p ; ... |- ( iff ( or phi_1 psi_1 ) ( or phi_2 psi_2 ) ) $= 
+    ( ctx.empty wff.or wff.iff ctx.append ctx.singleton axm.thin axm.iff-elim-1
+    axm.or-intr-1 axm.or-intr-2 axm.or-elim axm.iff-elim-2 axm.iff-intr
+    axm.assume ) HABCIZDEIZJHUAUBHUAKZBCUBHUATUCBKZDEUDBDHUALZBKBDJZFMUCBTNOUCCK
+    ZEDUGCEHUECKCEJZGMUCCTNPQHUBKZDEUAHUBTUIDKZBCUJBDHUBLZDKUFFMUIDTROUIEKZCBULC
+    EHUKEKUHGMUIETRPQSM $. 
+$}
+
+${
+  thm.eqv-implies.1 $e ; |- ( iff phi_1 phi_2 ) $.
+  thm.eqv-implies.2 $e ; |- ( iff psi_1 psi_2 ) $.
+  thm.eqv-implies   $p ; ... |- ( iff
+                                  ( implies phi_1 psi_1 )
+                                  ( implies phi_2 psi_2 ) ) $= 
+    ( wff.implies ctx.append ctx.singleton axm.thin axm.assume axm.implies-elim
+    ctx.empty axm.iff-elim-2 axm.iff-elim-1 axm.implies-intr axm.iff-intr
+    wff.iff ) NABCHZDEHZSNTUANTIZDEUBDIZCENTJDIZCESZGKUCBCUBDJTNTLKUCBDNUDBDSZFK
+    UBDLOMPQNUAIZBCUGBIZCENUAJBIZUEGKUHDEUGBJUANUALKUHBDNUIUFFKUGBLPMOQRK $.
+$}
+
+${
+  thm.eqv-iff.1 $e ; |- ( iff phi_1 phi_2 ) $.
+  thm.eqv-iff.2 $e ; |- ( iff psi_1 psi_2 ) $.
+  thm.eqv-iff   $p ; ... |- ( iff ( iff phi_1 psi_1 ) ( iff phi_2 psi_2 ) ) $= 
+    ( ctx.empty ctx.append ctx.singleton axm.thin axm.iff-elim-2 axm.iff-elim-1
+    wff.iff axm.assume axm.iff-intr ) HABCNZDENZNHQRHQIZDESDIZCEHQJZDIZCENZGKTBC
+    SDJQHQOZKTBDHUBBDNZFKSDOLMMSEIZBDHUAEIZUEFKUFBCSEJQUDKUFCEHUGUCGKSEOLLMPHRIZ
+    BCUHBIZCEHRJZBIZUCGKUIDEUHBJRHROZKUIBDHUKUEFKUHBOMMLUHCIZBDHUJCIZUEFKUMDEUHC
+    JRULKUMCEHUNUCGKUHCOMLLPPK $.
+$}
+
+${
+  $d x y $. $d y phi $. $d y psi $.
+  thm.eqv-sub.1 $e ; |- ( iff phi psi ) $.
+  thm.eqv-sub   $p ; ... |- ( iff ( sub trm_1 x phi ) ( sub trm_1 x psi ) ) $= 
+    ( ctx.empty wff.sub wff.iff sub.wff-iff def.sub-wff nf.ctx-none nf.trm-none
+    var.y sub.wff-intr nf.wff-sub-1 nf.wff-none axm.forall-intr axm.forall-elim
+    trm.var sub.wff-elim sub.wff-id axm.def-elim axm.thin ) GABDEHZCDEHZIZGBCIZD
+    EHZUGUHUGDEUEUFBCDEBDEOCDEOJKGUHUIDEUHDEOGUHDNTZHZUHNDGNLUHDUJDUJMPUHDNUHNQZ
+    UAGUKUKNUJUKNUBGUHUKDNGDLULUHDUJOFRSRSUCUD $.
+$}
+
+${
+  $d a x $. $d a phi $. $d a psi $.
+  thm.eqv-forall.1 $e ; |- ( iff phi psi ) $.
+  thm.eqv-forall   $p ; ... |- ( iff ( forall x phi ) ( forall x psi ) ) $= 
+    ( var.a ctx.empty qnt.forall wff.qnt wff.iff ctx.append wff.sub nf.ctx-none
+    nf.wff-sub-1 nf.wff-none sub.wff-elim ctx.singleton sub.wff-intr axm.assume
+    axm.thin trm.var nf.trm-none axm.forall-elim axm.iff-elim-1 axm.forall-intr
+    thm.eqv-sub axm.iff-elim-2 axm.iff-intr ) GABDHIZCDHIZJGUIUJGUIKZCDFUAZLZCFD
+    UKFMCDULDULUBZNCDFCFOPUKBDULLZUMGUIQUOUMJZGBCDULEUFZTUKBUODULBDULRGUISUCUDUE
+    GUJKZUOBFDURFMBDULUNNBDFBFOPURUOUMGUJQUPUQTURCUMDULCDULRGUJSUCUGUEUHT $.
+$}
+
+${
+  $d a x $. $d a phi $. $d a psi $.
+  thm.eqv-exists.1 $e ; |- ( iff phi psi ) $.
+  thm.eqv-exists   $p ; ... |- ( iff ( exists x phi ) ( exists x psi ) ) $= 
+    ( var.a ctx.empty qnt.exists wff.qnt wff.iff ctx.append wff.sub nf.ctx-none
+    nf.wff-none sub.wff-intr axm.assume ctx.singleton axm.thin axm.exists-intr
+    axm.exists-elim thm.eqv-sub axm.iff-elim-1 axm.iff-elim-2 axm.iff-intr
+    trm.var ) GABDHIZCDHIZJGUFUGGUFKZBBDFUEZLZUGFDUHFMBFNUGFNBDUIOZGUFPUHUJKZCDU
+    ILZCDUICDUIOZULUJUMGUFQUJKUJUMJZGBCDUIEUAZRUHUJPUBSTGUGKZCUMUFFDUQFMCFNUFFNU
+    NGUGPUQUMKZUJBDUIUKURUJUMGUGQUMKUOUPRUQUMPUCSTUDR $.
+$}
+
+${
+  $d x y $. $d y phi $. $d y psi $.
+  thm.eqv-unique.1 $e ; |- ( iff phi psi ) $.
+  thm.eqv-unique   $p ; ... |- ( iff ( unique x phi ) ( unique x psi ) ) $= 
+    ( var.y ctx.empty qnt.unique wff.qnt wff.iff ctx.append trm.var wff.implies
+    wff.sub qnt.forall wff.and qnt.exists def.unique ctx.singleton axm.thin
+    prd.eq lst.singleton lst.prepend thm.eqv-sub thm.eqv-implies thm.eqv-forall
+    wff.atm thm.eqv-and thm.eqv-exists axm.def-elim axm.iff-elim-1 axm.def-intr
+    thm.eqv-id axm.assume axm.iff-elim-2 axm.iff-intr ) GABDHIZCDHIZJGUQURGUQKZU
+    RCCDFLZNZUAUTDLUBUCUGZMZFOIZPZDQIZCDFRZUSBBDUTNZVBMZFOIZPZDQIZVFGUQSVLVFJZGV
+    KVEDGBVJCVDEGVIVCFGVHVBVAVBGBCDUTEUDGVBUMUEUFUHUIZTUSUQVLBDFRZGUQUNUJUKULGUR
+    KZUQVLVOVPVLVFGURSVMVNTVPURVFVGGURUNUJUOULUPT $. 
+$}

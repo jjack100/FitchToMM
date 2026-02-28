@@ -291,7 +291,6 @@ proveForallI allowed sub = do
         guard $ succeeded rPrf
         fullSub <- merge sub $ singletonVar "a" candName
         return $ (fullSub, [nfPrf1, nfPrf2, rPrf])
-
   asum $ map tryCandidate $ S.toList candidates
 
 proveExistsI :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
