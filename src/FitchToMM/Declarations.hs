@@ -266,7 +266,7 @@ base =
           "( forall x psi )"
           [(Nothing, "phi")]
           [CtxHyp "...", WffHyp "phi", WffHyp "psi", VarHyp "a", VarHyp "x"]
-          []
+          [mkDVR (VarHyp "a") (VarHyp "x")]
       ),
       ( "axm.exists-intr",
         declareFact
@@ -296,7 +296,7 @@ base =
             (Just "psi", "chi")
           ]
           [CtxHyp "...", WffHyp "phi", WffHyp "psi", WffHyp "chi", VarHyp "a", VarHyp "x"]
-          []
+          [mkDVR (VarHyp "a") (VarHyp "x")]
       ),
       ( "axm.eq-elim-1",
         declareFact

@@ -649,6 +649,7 @@ Introduction Rules
 $)
 
 ${ 
+  $d a x $.
   axm.forall-intr.1 $e ; NONFREE a ... $.
   axm.forall-intr.2 $e ; NONFREE x phi $.
   axm.forall-intr.3 $e ; psi REPLACES a IN phi WITH x $.
@@ -681,6 +682,7 @@ ${
 $}
 
 ${ 
+  $d a x $.
   axm.exists-elim.1 $e ; NONFREE a ... $.
   axm.exists-elim.2 $e ; NONFREE a phi $.
   axm.exists-elim.3 $e ; NONFREE a chi $.
@@ -794,7 +796,7 @@ $)
 $c unique $.
 qnt.unique $a qnt unique $.
 ${
-  $d y phi $.
+  $d x y $. $d y phi $.
   $( Define the uniqueness quantifier $)
   def.unique $a ; ( unique x phi ) :=
                   ( exists x ( and phi ( forall y ( implies
