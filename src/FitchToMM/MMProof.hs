@@ -1,9 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module FitchToMM.MMProof (Fact (..), MMProof (..), fromFitchProof) where
+module FitchToMM.MMProof (Fact (..), MMProof (..), fromFitchProof, fromEquivProof) where
 
 import Control.Monad
-import Control.Monad.Writer.Strict
 import Data.Foldable (asum)
 import Data.List
 import Data.Maybe
@@ -11,6 +10,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Vector as V
 import FitchToMM.Declarations
+import FitchToMM.Equivalence (proveEquiv)
 import FitchToMM.FitchProof
 import FitchToMM.Matcher
 import FitchToMM.Nonfree
@@ -30,65 +30,77 @@ data MMProof
     proofDvrs :: [DVR],
     -- The stack of labels in reverse Polish notation
     proofStack :: RpnStack,
-    -- List of mistakes paired with the (0-based) line numbers at which they occur
-    proofMistakes :: [(Int, Mistake)]
+    proofMistakes :: MistakesList
   }
   deriving (Show)
 
+-- List of mistakes paired with the (0-based) line numbers at which they occur
+type MistakesList = [(Int, Mistake)]
+
 fromFitchProof :: DeclMap -> FitchProof -> Maybe MMProof
-fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = do
+fromFitchProof decls prf@(FitchProof label allowed prems steps) = do
+  guard $ not $ null steps
+  (prfWriter, mistakes) <- proveFlatSteps decls allowed flat
+  let (fact, fHyps, dvrs, rpnStack) = proofInfo prfWriter ctx prems conclusion mandFHyps
+  return $ MMProof label fact fHyps dvrs rpnStack mistakes
+  where
+    ctx = RelContext []
+    flat = flattenProof prf
+    FlatStep _ conclusion _ _ _ = last flat
+    mandFHyps = foldMap varsInCond prems <> varsInWff conclusion <> (S.singleton $ CtxHyp "...")
+
+fromEquivProof :: DeclMap -> EquivProof -> Maybe MMProof
+fromEquivProof decls prf@(EquivProof label allowed steps) = do
+  guard $ not $ null steps
+  (prfWriter, mistakes) <- proveFlatSteps decls allowed flat
+  let (fact, fHyps, dvrs, rpnStack) = proofInfo prfWriter ctx [] conclusion mandFHyps
+  return $ MMProof label fact fHyps dvrs rpnStack mistakes
+  where
+    ctx = AbsContext []
+    flat = flattenEquivProof prf
+    FlatStep _ conclusion _ _ _ = last flat
+    mandFHyps = varsInWff conclusion
+
+proofInfo :: ProofWriter -> Context -> [Condition] -> Wff -> S.Set FHyp -> (Fact, [FHyp], [DVR], RpnStack)
+proofInfo prfWriter ctx conds conclusion mandFHyps =
+  (Fact ctx conclusion conds (sortVars $ S.elems mandFHyps) mandDVRs, allFHyps, dvrList, rpnStack)
+  where
+    (rpnStack, ProofProps optFHyps dvrs) = runProofWriter prfWriter
+    allFHyps = sortVars $ S.elems $ mandFHyps <> optFHyps
+    mandDVRs = S.toList $ getMandDVRs mandFHyps dvrs
+    dvrList = S.toList dvrs
+
+proveFlatSteps :: DeclMap -> AllowedSubs -> [FlatStep] -> Maybe (ProofWriter, MistakesList)
+proveFlatSteps decls allowed flatSteps = do
   -- Return nothing on empty proof
-  guard $ not $ null fitchSteps
-  return $
-    MMProof
-      prfName
-      ( Fact
-          finalClaim
-          prems
-          (sortVars $ S.elems mandFHyps)
-          (S.toList mandDVRs)
-      )
-      (sortVars $ S.elems allFHyps)
-      (S.toList dvrs)
-      finalRpnStack
-      mistakesList
+  guard $ not $ null flatSteps
+  return (finalProof, mistakesList)
   where
     -- We will build a table containing the subproofs corresponding to each step
-    flatProof = V.fromList $ flattenProof proof
+    flatProof = V.fromList flatSteps
     table = V.generate (V.length flatProof) (\i -> step i (flatProof V.! i))
 
-    -- Extract information from the table once it is built
-    FlatStep _ finalClaim _ _ _ = V.last flatProof
+    -- Get the proof from the last entry in the table
     finalProof = do
       -- Include those disjoint variable restrictions implied by the omission of
       -- any declared allowed substitutions (in addition to those incurred along
       -- the course of the proof)
-      let premDvrs = concatMap (\x -> inferDVRs allowedSubs (S.elems $ varsInCond x)) prems
-          claimDvrs = inferDVRs allowedSubs (S.elems $ varsInWff finalClaim)
-      mapM_ applyDVR premDvrs
-      mapM_ applyDVR claimDvrs
+      let getDvrs (FlatStep _ wff _ _ _) = inferDVRs allowed wff
+          dvrs = concatMap getDvrs flatSteps
+      mapM_ applyDVR dvrs
       V.last table
-    -- Get details relevant to just the fact (the non-extended frame)
-    mandFHyps = foldMap varsInCond prems <> varsInWff finalClaim <> (S.singleton $ CtxHyp "...")
+
     -- Collect any mistakes present among the steps
     mistakes = V.indexed $ fmap getMistake table
     mistakesList = mapMaybe sequence (V.toList mistakes)
-    -- Get details from the proof itself
-    (finalRpnStack, ProofProps optFHyps dvrs) = runProofWriter finalProof
-    allFHyps = mandFHyps <> optFHyps
-    -- Identify the mandatory disjoint variable restrictions (those that apply to mandatory vars)
-    mandDVRs =
-      S.filter
-        (\(DVR v1 v2) -> (v1 `S.member` mandFHyps) && (v2 `S.member` mandFHyps))
-        dvrs
 
-    -- Function for actually generating the proof at each step
+    -- Function for generating the proof at each step
     step :: Int -> FlatStep -> ProofWriter
     -- The proof should not end with any undischarged assumptions
     step i (FlatStep ctx _ _ _ _)
       | i + 1 == V.length flatProof,
         not $ nullCtx ctx =
-          lift $ Left LeftUndischarged
+          fromMistake LeftUndischarged
     -- Handle premises
     step _ (FlatStep _ _ (Premise num) _ _) =
       proveLocalStep $ RpnStep 0 (T.show $ num + 1)
@@ -100,34 +112,28 @@ fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = d
           wffPrf <- proveWff wff
           assumePrf <- proveStep $ RpnStep 2 "axm.assume"
           return $ ctxPrf <> wffPrf <> assumePrf
-    step _ (FlatStep _ _ Assumption _ _) = lift $ Left BadAssumption
+    step _ (FlatStep _ _ Assumption _ _) = fromMistake BadAssumption
     -- Handle reiteration
     step i (FlatStep ctx expr Reiteration [citation] _)
       | Line _ <- citation = do
           FlatStep _ cited _ _ _ <- lift $ lookupStep i ctx citation
-          unless (expr == cited) (lift $ Left Inapplicable)
+          unless (expr == cited) (fromMistake Inapplicable)
           lookupProof i ctx citation
-      | otherwise = lift $ Left Inapplicable
-    step _ (FlatStep _ _ Reiteration _ _) = lift $ Left BadCiteCount
+      | otherwise = fromMistake Inapplicable
+    step _ (FlatStep _ _ Reiteration _ _) = fromMistake BadCiteCount
     -- For rules that have multiple versions, provide an alias that tries alternatives
     step i fs@(FlatStep _ _ (Reference "axm.or-intr") _ _) = choice i fs ["axm.or-intr-1", "axm.or-intr-2"]
     step i fs@(FlatStep _ _ (Reference "axm.and-elim") _ _) = choice i fs ["axm.and-elim-1", "axm.and-elim-2"]
     step i fs@(FlatStep _ _ (Reference "axm.iff-elim") _ _) = choice i fs ["axm.iff-elim-1", "axm.iff-elim-2"]
     step i fs@(FlatStep _ _ (Reference "axm.eq-elim") _ _) = choice i fs ["axm.eq-elim-1", "thm.eq-elim-2"]
     -- Handle references to the definition of substitution
-    step i fs@(FlatStep _ _ (Reference "def.sub-wff") _ _) =
-      let intrPrf = proveDefI (proveDefSubWff allowedSubs) i fs
-          elimPrf = proveDefE (proveDefSubWff allowedSubs) i fs
-       in if succeeded intrPrf then intrPrf else elimPrf
-    step i fs@(FlatStep _ _ (Reference "def.sub-trm") _ _) =
-      let intrPrf = proveDefI (proveDefSubTrm allowedSubs) i fs
-          elimPrf = proveDefE (proveDefSubTrm allowedSubs) i fs
-       in if succeeded intrPrf then intrPrf else elimPrf
+    step i fs@(FlatStep _ _ (Reference "def.sub-wff") _ _) = proveDef (proveDefSubWff allowed) i fs
+    step i fs@(FlatStep _ _ (Reference "def.sub-trm") _ _) = proveDef (proveDefSubTrm allowed) i fs
     -- Handle application of a referenced rule
     step i fs@(FlatStep ctx wff (Reference ref) citations _)
-      | Just (Fact claim eHyps fHyps dvr) <- lookupFact ref = do
+      | Just (Fact (RelContext []) claim eHyps fHyps dvr) <- lookupFact ref = do
           -- Verify we are citing the correct number of lines for the fact we are referencing
-          unless (length citations == length eHyps) (lift $ Left BadCiteCount)
+          unless (length citations == length eHyps) (fromMistake BadCiteCount)
           citedSteps <- lift $ mapM (lookupStep i ctx) citations
           -- See if a valid substitution exists
           let ctxSub = singletonCtx ctx
@@ -136,12 +142,12 @@ fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = d
           merged <- try (mergeFold $ ctxSub : stmtSub : hypSubs) Inapplicable
           -- Handle rules requiring replacement statements as special cases
           let result = case ref of
-                "axm.forall-intr" -> proveForallI allowedSubs merged
-                "axm.exists-intr" -> proveExistsI allowedSubs merged
-                "axm.forall-elim" -> proveForallE allowedSubs merged
-                "axm.exists-elim" -> proveExistsE allowedSubs merged
-                "axm.eq-elim-1" -> proveEqE allowedSubs merged
-                "thm.eq-elim-2" -> proveEqE allowedSubs merged
+                "axm.forall-intr" -> proveForallI allowed merged
+                "axm.exists-intr" -> proveExistsI allowed merged
+                "axm.forall-elim" -> proveForallE allowed merged
+                "axm.exists-elim" -> proveExistsE allowed merged
+                "axm.eq-elim-1" -> proveEqE allowed merged
+                "thm.eq-elim-2" -> proveEqE allowed merged
                 _ -> Just (merged, [])
           (fullSub, extraHyps) <- try result Inapplicable
           applyDVRs fullSub dvr
@@ -150,7 +156,7 @@ fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = d
           eHypPrfs <- mapM (lookupProof i ctx) citations
           proveMMStep ref (concat [fHypPrfs, extraPrfs, eHypPrfs])
       | Just (Definition definiendum definiens fHyps dvr) <- lookupDef ref =
-          let proveDef fromDefiniendum fromDefiniens = do
+          let proveDefStmt fromDefiniendum fromDefiniens = do
                 sub1 <- try (fromDefiniendum `matchTo` definiendum) Inapplicable
                 sub2 <- try (fromDefiniens `matchTo` definiens) Inapplicable
                 fullSub <- try (merge sub1 sub2) Inapplicable
@@ -158,45 +164,49 @@ fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = d
                 fHypPrfs <- mapM (proveFHyp fullSub) fHyps
                 labelProof <- proveStep $ RpnStep (length fHypPrfs) ref
                 return $ mconcat fHypPrfs <> labelProof
-              intrPrf = proveDefI proveDef i fs
-              elimPrf = proveDefE proveDef i fs
-           in if succeeded intrPrf then intrPrf else elimPrf
-      | otherwise = lift $ Left UnrecognizedFact
+           in proveDef proveDefStmt i fs
+      | Just eqv <- lookupEqv ref = proveEqv eqv ref i fs
+      | otherwise = fromMistake UnrecognizedFact
 
-    -- Prove the introduction of a definition
-    proveDefI :: (Definiendum -> Definiens -> ProofWriter) -> Int -> FlatStep -> ProofWriter
-    proveDefI proveDef i (FlatStep ctx wff _ [citation] _) = do
+    -- Prove the introduction or elimination of a definition
+    proveDef :: (Definiendum -> Definiens -> ProofWriter) -> Int -> FlatStep -> ProofWriter
+    proveDef proveDefStmt i (FlatStep ctx wff _ [citation] _) = do
       (FlatStep _ cited _ _ _) <- lift $ lookupStep i ctx citation
-      sub <- try (mergeFold [singletonCtx ctx, singletonWff "phi" wff, singletonWff "psi" cited]) Inapplicable
-      let fHyps = [CtxHyp "...", WffHyp "phi", WffHyp "psi"]
-      fHypPrfs <- mapM (proveFHyp sub) fHyps
-      defSubPrf <- proveDef wff cited
-      citedPrf <- lookupProof i ctx citation
-      labelProof <- proveStep $ RpnStep 5 "axm.def-intr"
-      return $ mconcat fHypPrfs <> defSubPrf <> citedPrf <> labelProof
-    proveDefI _ _ _ = lift $ Left BadCiteCount
+      let intrPrf = prove "axm.def-intr" wff cited
+          elimPrf = prove "axm.def-elim" cited wff
+      alts [intrPrf, elimPrf]
+      where
+        fHyps = [CtxHyp "...", WffHyp "phi", WffHyp "psi"]
+        prove label ph ps = do
+          sub <- try (mergeFold [singletonCtx ctx, singletonWff "phi" ph, singletonWff "psi" ps]) Inapplicable
+          fHypPrfs <- mapM (proveFHyp sub) fHyps
+          citedPrf <- lookupProof i ctx citation
+          defSubPrf <- proveDefStmt ph ps
+          proveMMStep label $ fHypPrfs ++ [defSubPrf, citedPrf]
+    proveDef _ _ _ = fromMistake BadCiteCount
 
-    -- Prove the elimination of a definition
-    proveDefE :: (Definiendum -> Definiens -> ProofWriter) -> Int -> FlatStep -> ProofWriter
-    proveDefE proveDef i (FlatStep ctx wff _ [citation] _) = do
-      (FlatStep _ cited _ _ _) <- lift $ lookupStep i ctx citation
-      sub <- try (mergeFold [singletonCtx ctx, singletonWff "phi" cited, singletonWff "psi" wff]) Inapplicable
-      let fHyps = [CtxHyp "...", WffHyp "phi", WffHyp "psi"]
-      fHypPrfs <- mapM (proveFHyp sub) fHyps
-      defSubPrf <- proveDef cited wff
+    proveEqv :: EquivFact -> Label -> Int -> FlatStep -> ProofWriter
+    proveEqv eqv ref i (FlatStep ctx wff _ [citation] _) = do
+      FlatStep _ citedWff _ _ _ <- lift $ lookupStep i ctx citation
+      ctxPrf <- proveCtx ctx
+      wffCitedPrf <- proveWff citedWff
+      wffPrf <- proveWff wff
       citedPrf <- lookupProof i ctx citation
-      labelProof <- proveStep $ RpnStep 5 "axm.def-elim"
-      return $ mconcat fHypPrfs <> defSubPrf <> citedPrf <> labelProof
-    proveDefE _ _ _ = lift $ Left BadCiteCount
+      let prf1 = do
+            eqvPrf <- proveEquiv eqv ref ctx citedWff wff
+            proveMMStep "axm.iff-elim-1" [ctxPrf, wffCitedPrf, wffPrf, eqvPrf, citedPrf]
+          prf2 = do
+            eqvPrf <- proveEquiv eqv ref ctx wff citedWff
+            proveMMStep "axm.iff-elim-2" [ctxPrf, wffPrf, wffCitedPrf, eqvPrf, citedPrf]
+      alts [prf1, prf2]
+    proveEqv _ _ _ _ = fromMistake BadCiteCount
 
     -- Try several possible references, and take the first that succeeds
     choice :: Int -> FlatStep -> [T.Text] -> ProofWriter
-    choice i (FlatStep ctx expr original cites pos) choices =
+    choice i (FlatStep ctx expr _ cites pos) choices =
       let apply jus = step i (FlatStep ctx expr jus cites pos)
           results = map (apply . Reference) choices
-          -- Apply the original justification if the choices list was empty
-          defaultRes = fromMaybe (apply original) $ listToMaybe results
-       in fromMaybe defaultRes $ find succeeded results
+       in alts results
 
     -- Lookup a past step given a citation
     lookupStep :: Int -> Context -> Citation -> Either Mistake FlatStep
@@ -213,28 +223,29 @@ fromFitchProof decls proof@(FitchProof prfName allowedSubs prems fitchSteps) = d
     -- Lookup the proof of a past step given a citation
     lookupProof :: Int -> Context -> Citation -> ProofWriter
     lookupProof i ctx cite@(Line line)
-      | Just err <- checkAccessibility flatProof i cite = lift $ Left err
+      | Just err <- checkAccessibility flatProof i cite = fromMistake err
       | otherwise = do
           -- Try to thin it into the given context if necessary
           let prf = table V.! line
               stp = flatProof V.! line
           -- On failure, run the proof writer to just emit a "?"
-          basePrf <- if succeeded prf then prf else pure $ fst $ runProofWriter prf
+          basePrf <- alts [prf, pure $ fst $ runProofWriter prf]
           proveThin ctx stp basePrf
     lookupProof i _ cite@(Range _ to)
-      | Just err <- checkAccessibility flatProof i cite = lift $ Left err
+      | Just err <- checkAccessibility flatProof i cite = fromMistake err
       | otherwise =
           let prf = table V.! to
-           in if succeeded prf then prf else pure $ fst $ runProofWriter prf
+           in alts [prf, pure $ fst $ runProofWriter prf]
 
     lookupFact = findFact decls
     lookupDef = findDefinition decls
+    lookupEqv = findEquiv decls
 
 -- Apply disjoint variable conditions
 applyDVRs :: Substitution -> [DVR] -> PropWriter
-applyDVRs sub dConds = do
-  disjointVars <- try (checkDisjoints sub dConds) Inapplicable
-  mapM_ applyDVR disjointVars
+applyDVRs sub fromDVRs = do
+  toDVRs <- try (checkDisjoints sub fromDVRs) Inapplicable
+  mapM_ applyDVR toDVRs
 
 -- Check if a line or subproof is accessible to (able to be legitimately cited by) a given line
 checkAccessibility :: V.Vector FlatStep -> Int -> Citation -> Maybe Mistake
@@ -383,13 +394,6 @@ proveDefSubTrm allowedSubs definiendum definiens = do
   -- Prove the definition statement
   proveMMStep "def.sub-trm" (fHypPrfs ++ [replPrf])
 
-proveFHyp :: Substitution -> FHyp -> ProofWriter
-proveFHyp sub (WffHyp hyp) | Just wff <- lookupWff hyp sub = proveWff wff
-proveFHyp sub (VarHyp hyp) | Just var <- lookupVar hyp sub = proveVar var
-proveFHyp sub (TrmHyp hyp) | Just trm <- lookupTrm hyp sub = proveTrm trm
-proveFHyp sub (CtxHyp hyp) | Just ctx <- lookupCtx hyp sub = proveCtx ctx
-proveFHyp _ hyp = proveMetavar $ markInternal hyp
-
 -- Tries to thin a step to match a given context
 proveThin :: Context -> FlatStep -> RpnStack -> ProofWriter
 proveThin toCtx (FlatStep fromCtx ps _ _ _) basePrf = case extras fromCtx toCtx of
@@ -399,7 +403,7 @@ proveThin toCtx (FlatStep fromCtx ps _ _ _) basePrf = case extras fromCtx toCtx 
     ctx2Prf <- proveCtx $ AbsContext extraAssumptions
     psPrf <- proveWff ps
     proveMMStep "axm.thin" [ctx1Prf, ctx2Prf, psPrf, basePrf]
-  Nothing -> lift $ Left Inapplicable
+  Nothing -> fromMistake Inapplicable
   where
     extras (RelContext from) (RelContext to) = stripSuffix from to
     extras (AbsContext from) (AbsContext to) = stripSuffix from to
@@ -425,5 +429,12 @@ varsInCond :: Condition -> S.Set FHyp
 varsInCond (Condition (Just sup) hyp) = varsInWff sup <> varsInWff hyp
 varsInCond (Condition Nothing hyp) = varsInWff hyp
 
-try :: (MonadTrans t) => Maybe a1 -> a2 -> t (Either a2) a1
-try val err = lift $ maybe (Left err) Right val
+-- Identify the mandatory disjoint variable restrictions (those that apply to mandatory vars)
+getMandDVRs :: S.Set FHyp -> S.Set DVR -> S.Set DVR
+getMandDVRs mandFHyps allDVRs =
+  S.filter
+    (\(DVR v1 v2) -> (v1 `S.member` mandFHyps) && (v2 `S.member` mandFHyps))
+    allDVRs
+
+try :: Maybe a -> Mistake -> ProofWriterM a
+try val err = maybe (fromMistake err) pure val

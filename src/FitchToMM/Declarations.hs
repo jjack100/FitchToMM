@@ -9,6 +9,7 @@ module FitchToMM.Declarations
     Definiens,
     Declaration (..),
     Condition (..),
+    EquivFact (..),
     AllowedSubs,
     findFact,
     insertDecl,
@@ -21,6 +22,8 @@ module FitchToMM.Declarations
     fromListM,
     emptyDeclMap,
     insertSymbol,
+    findEquiv,
+    factAsEquiv,
   )
 where
 
@@ -39,8 +42,9 @@ data DeclMap = DeclMap (M.Map Label Declaration) (M.Map T.Text SymbolType)
 data Declaration
   = FactDeclaration Fact
   | DefDeclaration Definition
+  | EquivDeclaration EquivFact
 
-data Fact = Fact Wff [Condition] [FHyp] [DVR]
+data Fact = Fact Context Wff [Condition] [FHyp] [DVR]
   deriving (Show)
 
 -- A condition can optionally be making a supposition, i.e., an assumption to be
@@ -51,6 +55,9 @@ data Condition = Condition (Maybe Wff) Wff
 type AllowedSubs = T.Text -> [T.Text]
 
 data Definition = Definition Definiendum Definiens [FHyp] [DVR]
+
+data EquivFact = EquivFact Wff Wff [FHyp] [DVR]
+  deriving (Show)
 
 type Definiendum = Wff
 
@@ -68,8 +75,22 @@ findDefinition (DeclMap declMap _) label = case declMap M.!? label of
   (Just (DefDeclaration def)) -> Just def
   _ -> Nothing
 
+findEquiv :: DeclMap -> Label -> Maybe EquivFact
+findEquiv (DeclMap declMap _) label = case declMap M.!? label of
+  (Just (EquivDeclaration def)) -> Just def
+  _ -> Nothing
+
 toLanguage :: DeclMap -> Language
 toLanguage (DeclMap _ symbolMap) = Language $ \symbol -> symbolMap M.!? symbol
+
+-- Produce an equivalence fact if the given fact has the form of an equivalence
+factAsEquiv :: Fact -> Maybe EquivFact
+factAsEquiv (Fact _ claim conds fHyps dvrs) = do
+  guard $ null conds
+  (lhs, rhs) <- case claim of
+    WffBinOp OpIff x y -> Just (x, y)
+    _ -> Nothing
+  return $ EquivFact lhs rhs fHyps dvrs
 
 fromList :: [(Label, Language -> Declaration)] -> DeclMap
 fromList = foldl' append emptyDeclMap
@@ -86,7 +107,7 @@ fromListM = foldM append emptyDeclMap
       return $ insertDecl prev label decl
 
 mkFact :: Sexpr -> [(Maybe Sexpr, Sexpr)] -> [FHyp] -> [DVR] -> Language -> Either ParseError Fact
-mkFact claim conds fhyps dvrs lang = do
+mkFact claim conds fHyps dvrs lang = do
   let parse = parseFormula lang
   claimWff <- parse claim
   let parseCond (supp, cond) = do
@@ -94,7 +115,7 @@ mkFact claim conds fhyps dvrs lang = do
         condWff <- parse cond
         return $ Condition suppWff condWff
   parsedConds <- traverse parseCond conds
-  return $ Fact claimWff parsedConds fhyps dvrs
+  return $ Fact (RelContext []) claimWff parsedConds fHyps dvrs
 
 mkDef :: Sexpr -> Sexpr -> AllowedSubs -> Language -> Either ParseError Definition
 mkDef definiendum definiens allowedSubs lang = do
@@ -102,11 +123,11 @@ mkDef definiendum definiens allowedSubs lang = do
   definiendumWff <- parse definiendum
   definiensWff <- parse definiens
   let fHyps = sortVars $ S.elems $ varsInWff definiendumWff <> varsInWff definiensWff
-      dvrs = inferDVRs allowedSubs fHyps
+      dvrs = inferDVRs allowedSubs definiendumWff <> inferDVRs allowedSubs definiensWff
   return $ Definition definiendumWff definiensWff fHyps dvrs
 
-inferDVRs :: AllowedSubs -> [FHyp] -> [DVR]
-inferDVRs allowed fhyps = nubOrd $ do
+inferDVRs :: AllowedSubs -> Wff -> [DVR]
+inferDVRs allowed wff = nubOrd $ do
   -- Consider all possible pairings between two different variables
   var1 <- fhyps
   var2 <- fhyps
@@ -119,6 +140,8 @@ inferDVRs allowed fhyps = nubOrd $ do
   -- Don't include DVRs when the substitution is explicitly allowed
   guard $ not $ (fHypName var1) `elem` allowed (fHypName var2)
   return $ mkDVR var1 var2
+  where
+    fhyps = S.toList $ varsInWff wff
 
 insertDecl :: DeclMap -> Label -> Declaration -> DeclMap
 insertDecl (DeclMap declMap lang) label decl = DeclMap (M.insert label decl declMap) lang

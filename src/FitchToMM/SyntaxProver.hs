@@ -13,14 +13,15 @@ module FitchToMM.SyntaxProver
     occursInWff,
     occursInTrm,
     occursInCtx,
+    proveFHyp,
   )
 where
 
-import Control.Monad.Writer.Strict
 import qualified Data.Text as T
 import FitchToMM.Declarations (AllowedSubs)
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
+import FitchToMM.Matcher 
 
 proveWff :: Wff -> ProofWriter
 -- Handle binary connectives
@@ -67,7 +68,7 @@ proveLst (term : terms) = do
   trmPrf <- proveTrm term
   lstPrf <- proveLst terms
   proveMMStep "lst.prepend" [trmPrf, lstPrf]
-proveLst _ = lift $ Left EmptyList
+proveLst _ = fromMistake EmptyList
 
 provePrependLst :: [Term] -> ProofWriter
 provePrependLst [term] = do
@@ -77,7 +78,7 @@ provePrependLst (term : terms) = do
   trmPrf <- proveTrm term
   lstPrf <- provePrependLst terms
   proveMMStep "lst.append" [trmPrf, lstPrf]
-provePrependLst _ = lift $ Left EmptyList
+provePrependLst _ = fromMistake EmptyList
 
 proveTrm :: Term -> ProofWriter
 proveTrm (TrmVar x) = do
@@ -109,6 +110,13 @@ proveCtxAppend toCtx wffs phi = do
   ctxPrf <- proveCtx $ toCtx wffs
   phPrf <- proveWff phi
   proveMMStep "ctx.append" [ctxPrf, phPrf]
+
+proveFHyp :: Substitution -> FHyp -> ProofWriter
+proveFHyp sub (WffHyp hyp) | Just wff <- lookupWff hyp sub = proveWff wff
+proveFHyp sub (VarHyp hyp) | Just var <- lookupVar hyp sub = proveVar var
+proveFHyp sub (TrmHyp hyp) | Just trm <- lookupTrm hyp sub = proveTrm trm
+proveFHyp sub (CtxHyp hyp) | Just ctx <- lookupCtx hyp sub = proveCtx ctx
+proveFHyp _ hyp = proveMetavar $ markInternal hyp
 
 occursInCtx :: AllowedSubs -> T.Text -> Context -> Bool
 occursInCtx a x ctx = any (occursInWff a x) (ctxWffs ctx)

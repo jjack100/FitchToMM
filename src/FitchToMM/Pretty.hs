@@ -14,7 +14,7 @@ module FitchToMM.Pretty
 where
 
 import Data.Algorithm.MaximalCliques (getMaximalCliques)
-import Data.List
+import Data.List (find, sortOn, unfoldr, (\\))
 import Data.Ord
 import qualified Data.Set as S
 import qualified Data.Text as T
@@ -74,12 +74,15 @@ prettyDefinition label symbolType definedTerm definition =
         let RpnStep _ synLabel = constStep label
          in pretty synLabel <+> "$a trm" <+> pretty definedTerm <+> "$."
     defStmt =
-      pretty label
-        <+> "$a ;"
-        <+> prettyWff definiendum
-        <+> ":="
-        <+> prettyWff definiens
-        <+> "$."
+      nest 2 $
+        group $
+          pretty label
+            <+> "$a ;"
+            <+> prettyWff definiendum
+            <+> ":="
+            <> line
+            <> prettyWff definiens
+            <+> "$."
     localVars = fHyps \\ preDeclaredVars
     compounds = compoundDVRs fHyps dvrs
     Definition definiendum definiens fHyps dvrs = definition
@@ -90,10 +93,10 @@ prettyProof name fact fHyps dvrs prettyStack =
     vsep $
       prettyVars name localVars
         ++ [sep $ map prettyCompoundDVR compounds | not $ null dvrs]
-        ++ zipWith prettyEHyp (map pad eLabels) eHyps
-        ++ [prettyPStmt (pad name) claim prettyStack]
+        ++ zipWith (prettyEHyp ctx) (map pad eLabels) eHyps
+        ++ [prettyPStmt ctx (pad name) claim prettyStack]
   where
-    (Fact claim eHyps _ _) = fact
+    (Fact ctx claim eHyps _ _) = fact
     eLabels = map (number name) [1 .. length eHyps]
     labelLen = maximum $ map T.length (name : eLabels)
     pad = T.justifyLeft labelLen ' '
@@ -130,28 +133,39 @@ prettyCompoundDVR dvr = "$d" <+> fillSep names <+> "$."
   where
     names = map (pretty . fHypName) $ S.toList dvr
 
-prettyPStmt :: T.Text -> Wff -> Doc a -> Doc a
-prettyPStmt label claim proof =
+prettyPStmt :: Context -> T.Text -> Wff -> Doc a -> Doc a
+prettyPStmt ctx label claim proof =
   pretty label
-    <+> "$p ; ... |-"
+    <+> "$p ;"
+    <+> prettyCtx ctx
+    <> "|-"
     <+> prettyWff claim
     <+> "$="
     <+> nest 2 (line <> proof)
     <+> "$."
 
-prettyEHyp :: T.Text -> Condition -> Doc a
-prettyEHyp label (Condition (Just sup) hyp) =
+prettyEHyp :: Context -> T.Text -> Condition -> Doc a
+prettyEHyp ctx label (Condition (Just sup) hyp) =
   pretty label
-    <+> "$e ; ..."
-    <+> prettyWff sup
+    <+> "$e ;"
+    <+> prettyCtx ctx
+    <> prettyWff sup
     <+> "|-"
     <+> prettyWff hyp
     <+> "$."
-prettyEHyp label (Condition Nothing hyp) =
+prettyEHyp ctx label (Condition Nothing hyp) =
   pretty label
-    <+> "$e ; ... |-"
+    <+> "$e ;"
+    <+> prettyCtx ctx
+    <> "|-"
     <+> prettyWff hyp
     <+> "$."
+
+prettyCtx :: Context -> Doc a
+prettyCtx (RelContext []) = "..." <> space
+prettyCtx (RelContext ctx) = "..." <+> sep (map prettyWff $ reverse ctx) <> space
+prettyCtx (AbsContext []) = mempty
+prettyCtx (AbsContext ctx) = sep (map prettyWff $ reverse ctx) <> space
 
 prettyWff :: Wff -> Doc a
 prettyWff (WffBinOp op lhs rhs) =

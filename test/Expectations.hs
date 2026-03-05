@@ -10,13 +10,17 @@ module Expectations
     shouldReportMistakes,
     shouldFail,
     verifyStmt,
-    sampleSyntax
+    sampleSyntax,
+    shouldVerifyCollection,
   )
 where
 
+import Data.Bifunctor (first)
+import Data.Foldable (traverse_)
 import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
+import FitchToMM.Collection
 import FitchToMM.Compressed (compressProof, packProof)
 import FitchToMM.Declarations
 import FitchToMM.FitchProof
@@ -24,14 +28,19 @@ import FitchToMM.MMProof
 import FitchToMM.Parser
 import FitchToMM.Pretty
 import FitchToMM.ProofWriter
+import qualified FitchToMM.Serialize as SE
 import Hmm
 import Prettyprinter
 import Prettyprinter.Render.String
 import Test.Hspec
 import Test.QuickCheck
+import Control.Monad (unless)
 
 shouldVerifyProof :: T.Text -> FitchProof -> Expectation
 shouldVerifyProof baseTxt theorem = shouldBeRight $ verifyProof baseTxt theorem
+
+shouldVerifyCollection :: T.Text -> SE.Collection -> Expectation
+shouldVerifyCollection baseTxt collection = shouldBeRight $ verifyCollection baseTxt collection
 
 shouldReportMistakes :: FitchProof -> [(Int, Mistake)] -> Expectation
 shouldReportMistakes theorem =
@@ -44,6 +53,25 @@ shouldFail theorem = shouldSatisfy (fromFitchProof base theorem) isNothing
 shouldBeRight :: (Show a) => Either a b -> Expectation
 shouldBeRight (Left err) = expectationFailure $ show err
 shouldBeRight (Right _) = pure ()
+
+verifyCollection :: T.Text -> SE.Collection -> Either String ()
+verifyCollection baseTxt collection = do
+  (Collection _ _ items) <- first T.unpack $ SE.parseCollection base collection
+  prettied <- traverse prettyItem items
+  (_, db) <- mmParseFromString $ T.unpack baseTxt ++ ' ' : (renderString $ layoutCompact $ vsep prettied)
+  traverse_ snd (mmVerifiesAll db)
+  return ()
+  where
+    prettyItem :: Item -> Either String (Doc a)
+    prettyItem (TheoremItem _ prf) = do
+      let mistakes = proofMistakes prf
+      unless (null mistakes) (Left $ show mistakes)
+      return $ prettyCompressed $ compressProof $ packProof prf
+    prettyItem (DefinitionItem l _ symType symbol def) = pure $ prettyDefinition l symType symbol def
+    prettyItem (EquivItem _ prf) = do
+      let mistakes = proofMistakes prf
+      unless (null mistakes) (Left $ show mistakes)
+      return $ prettyCompressed $ compressProof $ packProof prf
 
 verifyProof :: T.Text -> FitchProof -> Either String ()
 verifyProof baseTxt theorem@(FitchProof name _ _ _) = do

@@ -9,7 +9,6 @@ module FitchToMM.Replacement
 where
 
 import Control.Monad (guard, zipWithM)
-import qualified Control.Monad.Writer.Strict as W
 import Data.Monoid (First (..))
 import qualified Data.Text as T
 import FitchToMM.Declarations (AllowedSubs)
@@ -215,7 +214,7 @@ proveReplWff allowed ph y (WffSub (TrmVar y') x ph') (TrmVar x')
       yPrf <- proveVar y
       nfPrf <- proveNfWff allowed y ph
       proveMMStep "sub.wff-elim" [phPrf, xPrf, yPrf, nfPrf]
-proveReplWff _ _ _ _ _ = W.lift $ Left Inapplicable
+proveReplWff _ _ _ _ _ = fromMistake Inapplicable
 
 proveReplLst :: AllowedSubs -> [Term] -> Var -> [Term] -> Term -> ProofWriter
 proveReplLst allowed [t1] x [t2] t3 = proveReplTrm allowed t1 x t2 t3
@@ -229,7 +228,7 @@ proveReplLst allowed (t : vs) x (u : ws) t1 = do
     rPrf1 <- proveReplLst allowed [t] x [u] t1
     rPrf2 <- proveReplLst allowed vs x ws t1
     proveMMStep "sub.lst" [xPrf, t1Prf, tsPrf, usPrf, vsPrf, wsPrf, rPrf1, rPrf2]
-proveReplLst _ _ _ _ _ = W.lift $ Left EmptyList
+proveReplLst _ _ _ _ _ = fromMistake EmptyList
 
 proveReplTrm :: AllowedSubs -> Term -> Var -> Term -> Term -> ProofWriter
 -- Replacing a single variable with a term just yields that term
@@ -310,4 +309,4 @@ proveReplTrm allowed t y (TrmSub (TrmVar y') x t') (TrmVar x')
       tPrf <- proveTrm t
       nfPrf <- proveNfTrm allowed y t
       proveMMStep "sub.trm-elim" [xPrf, yPrf, tPrf, nfPrf]
-proveReplTrm _ _ _ _ _ = W.lift $ Left Inapplicable
+proveReplTrm _ _ _ _ _ = fromMistake Inapplicable

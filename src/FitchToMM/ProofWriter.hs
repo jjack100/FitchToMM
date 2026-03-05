@@ -1,10 +1,12 @@
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE InstanceSigs #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module FitchToMM.ProofWriter
-  ( ProofWriter,
+  ( ProofWriterM,
+    ProofWriter,
     Mistake (..),
     RpnStack,
     RpnStep (..),
@@ -13,7 +15,7 @@ module FitchToMM.ProofWriter
     Label,
     DVR (..),
     PropWriter,
-    Context(..),
+    Context (..),
     proveMetavar,
     proveVar,
     proveStep,
@@ -43,9 +45,13 @@ module FitchToMM.ProofWriter
     unconsCtx,
     nullCtx,
     assume,
+    fromMistake,
+    lift,
+    alts,
   )
 where
 
+import Control.Applicative ((<|>))
 import qualified Control.Monad.Writer.Strict as W
 import qualified Data.DList as D
 import Data.Either
@@ -58,9 +64,15 @@ import FitchToMM.Parser (Wff)
 import GHC.Generics
 
 -- Helper Monad to build the RPN stack while tracking properties about the proof
-type ProofWriter = W.WriterT ProofProps (Either Mistake) RpnStack
+newtype ProofWriterM a = ProofWriterM (W.WriterT ProofProps (Either Mistake) a)
+  deriving (Show)
+  deriving
+    (Functor, Applicative, Monad)
+    via W.WriterT ProofProps (Either Mistake)
 
-type PropWriter = W.WriterT ProofProps (Either Mistake) ()
+type ProofWriter = ProofWriterM RpnStack
+
+type PropWriter = ProofWriterM ()
 
 data ProofProps = ProofProps (S.Set FHyp) (S.Set DVR)
   deriving (Show, Generic)
@@ -118,9 +130,21 @@ data Mistake
   | UnrecognizedFact
   deriving (Eq, Show)
 
+lift :: Either Mistake a -> ProofWriterM a
+lift = ProofWriterM . W.lift
+
+fromMistake :: Mistake -> ProofWriterM a
+fromMistake = lift . Left
+
+alts :: [ProofWriterM a] -> ProofWriterM a
+alts choices =
+  fromMaybe
+    (fromMistake Inapplicable)
+    (find succeeded choices <|> listToMaybe choices)
+
 proveMetavar :: FHyp -> ProofWriter
 proveMetavar fhyp = do
-  W.tell $ ProofProps (S.singleton fhyp) S.empty
+  ProofWriterM $ W.tell $ ProofProps (S.singleton fhyp) S.empty
   let prove = if fhyp `elem` preDeclaredVars then proveStep else proveLocalStep
   prove $ RpnStep 0 $ fHypLabel fhyp
 
@@ -178,21 +202,21 @@ proveLocalStep = pure . RpnStack . D.singleton . (StackEntry True)
 mkDVR :: FHyp -> FHyp -> DVR
 mkDVR v1 v2 = if v1 <= v2 then DVR v1 v2 else DVR v2 v1
 
-applyDVR :: DVR -> W.WriterT ProofProps (Either Mistake) ()
+applyDVR :: DVR -> PropWriter
 applyDVR dvr@(DVR v1 v2)
-  | v1 /= v2 = W.tell $ ProofProps S.empty (S.singleton dvr)
+  | v1 /= v2 = ProofWriterM $ W.tell $ ProofProps S.empty (S.singleton dvr)
   | otherwise = pure ()
 
 reqDisjoint :: FHyp -> FHyp -> PropWriter
 reqDisjoint v1 v2
-  | v1 /= v2 = W.tell $ ProofProps S.empty (S.singleton $ mkDVR v1 v2)
+  | v1 /= v2 = ProofWriterM $ W.tell $ ProofProps S.empty (S.singleton $ mkDVR v1 v2)
   | otherwise = pure ()
 
 reqDisjointFor :: (Foldable t) => FHyp -> t FHyp -> PropWriter
 reqDisjointFor v = mapM_ (reqDisjoint v)
 
 runProofWriter :: ProofWriter -> (RpnStack, ProofProps)
-runProofWriter writer = case W.runWriterT writer of
+runProofWriter (ProofWriterM writer) = case W.runWriterT writer of
   Left _ -> (RpnStack (D.singleton Unknown), ProofProps S.empty S.empty)
   Right res -> res
 
@@ -200,15 +224,15 @@ execProofWriter :: ProofWriter -> ProofProps
 execProofWriter = snd . runProofWriter
 
 getMistake :: ProofWriter -> Maybe Mistake
-getMistake writer = case W.runWriterT writer of
+getMistake (ProofWriterM writer) = case W.runWriterT writer of
   Left err -> Just err
   Right _ -> Nothing
 
-failed :: ProofWriter -> Bool
-failed = isLeft . W.runWriterT
+failed :: ProofWriterM a -> Bool
+failed (ProofWriterM writer) = isLeft $ W.runWriterT writer
 
-succeeded :: ProofWriter -> Bool
-succeeded = isRight . W.runWriterT
+succeeded :: ProofWriterM a -> Bool
+succeeded (ProofWriterM writer) = isRight $ W.runWriterT writer
 
 listStack :: T.Text -> RpnStack -> [T.Text]
 listStack thmLabel stack =

@@ -84,6 +84,33 @@
                             "allowedSubs": {
                                 "description": "Map from metavariables to a list of variables that may occur in the substituted formula or term\nAllowedSubs"
                             },
+                            "label": {
+                                "description": "MMLabel"
+                            },
+                            "steps": {
+                                "description": "Fitch-style steps (that for an equivalence proof should end in a biconditional statement)",
+                                "items": {
+                                    "$ref": "#/$defs/ProofStep"
+                                },
+                                "type": "array"
+                            },
+                            "type": {
+                                "const": "equivalence"
+                            }
+                        },
+                        "required": [
+                            "type",
+                            "steps",
+                            "allowedSubs",
+                            "label"
+                        ],
+                        "type": "object"
+                    },
+                    {
+                        "properties": {
+                            "allowedSubs": {
+                                "description": "Map from metavariables to a list of variables that may occur in the substituted formula or term\nAllowedSubs"
+                            },
                             "definiendum": {
                                 "description": "The formula containing the defined symbol, to be equated with the definiens",
                                 "type": "string"

@@ -25,7 +25,7 @@ import Data.Char (isAlphaNum, isAscii)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map.Strict as M
 import qualified Data.Text as T
-import FitchToMM.Collection (fromListE)
+import FitchToMM.Collection (fromList)
 import qualified FitchToMM.Collection as C
 import FitchToMM.Declarations (toLanguage)
 import qualified FitchToMM.Declarations as D
@@ -65,6 +65,11 @@ data Item
         definiendum :: T.Text,
         definiens :: T.Text
       }
+  | Equivalence
+      { label :: MMLabel,
+        allowedSubs :: AllowedSubs,
+        steps :: [ProofStep]
+      }
 
 instance HasCodec Item where
   codec = object "Item" $ discriminatedUnionCodec "type" enc dec
@@ -82,12 +87,19 @@ instance HasCodec Item where
           <*> requiredField "symbol" "The symbol to be defined" .= symbol
           <*> requiredField "definiendum" "The formula containing the defined symbol, to be equated with the definiens" .= definiendum
           <*> requiredField "definiens" "The formula on the right-hand side of ':=', used to define the symbol" .= definiens
+      equivCodec =
+        Equivalence
+          <$> requiredField' "label" .= label
+          <*> requiredField' "allowedSubs" .= allowedSubs
+          <*> requiredField "steps" "Fitch-style steps (that for an equivalence proof should end in a biconditional statement)" .= steps
       enc itm@(Theorem _ _ _ _) = ("Theorem", mapToEncoder itm theoremCodec)
       enc itm@(Definition _ _ _ _ _) = ("Definition", mapToEncoder itm definitionCodec)
+      enc itm@(Equivalence _ _ _) = ("Equivalence", mapToEncoder itm equivCodec)
       dec =
         HashMap.fromList
           [ ("theorem", ("Theorem", mapToDecoder id theoremCodec)),
-            ("definition", ("Definition", mapToDecoder id definitionCodec))
+            ("definition", ("Definition", mapToDecoder id definitionCodec)),
+            ("equivalence", ("Equivalence", mapToDecoder id equivCodec))
           ]
 
 data Symbol = Predicate T.Text Int | Function T.Text Int | Constant T.Text
@@ -241,7 +253,7 @@ writeSchema path = BL.writeFile path $ encodePretty revisedSchema
 
 parseCollection :: D.DeclMap -> Collection -> Either T.Text C.Collection
 parseCollection declMap (Collection cTitle cItems) =
-  fromListE cTitle declMap (map parseItem cItems)
+  fromList cTitle declMap (map parseItem cItems)
 
 parseItem :: Item -> D.DeclMap -> Either T.Text C.Item
 parseItem (Theorem (MMLabel itmName) itmAllowedSubs itmPrems itmSteps) declMap = do
@@ -263,6 +275,15 @@ parseItem (Definition (MMLabel itmName) itmAllowedSubs itmSymb itmDefiniendum it
       subsFunc x = M.findWithDefault [] x subs
   def <- first T.show $ D.mkDef itmDefiniendum itmDefiniens subsFunc l
   return $ C.DefinitionItem itmName subsFunc symTyp symName def
+parseItem (Equivalence (MMLabel itmName) itmAllowedSubs itmSteps) declMap = do
+  let l = toLanguage declMap
+  parsedSteps <- mapM (parseProofStep l) itmSteps
+  let AllowedSubs subs = itmAllowedSubs
+      subsFunc x = M.findWithDefault [] x subs
+      equivProof = F.EquivProof itmName subsFunc parsedSteps
+      maybeMMProof = MM.fromEquivProof declMap equivProof
+  mmProof <- maybe (Left "Empty theorem") Right maybeMMProof
+  return $ C.EquivItem equivProof mmProof
 
 getSymbolType :: Symbol -> P.SymbolType
 getSymbolType (Predicate _ arity) = P.SymPredicate arity

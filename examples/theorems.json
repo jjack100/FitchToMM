@@ -389,6 +389,158 @@
           "cites": [4]
         }
       ]
+    },
+    {
+      "type": "equivalence",
+      "label": "eqv.dem",
+      "allowedSubs": {},
+      "steps": [
+        {
+          "type": "subproof",
+          "assumption": "( not ( or phi psi ) )",
+          "substeps": [
+            {
+              "type": "subproof",
+              "assumption": "phi",
+              "substeps": [
+                {
+                  "type": "step",
+                  "expression": "( or phi psi )",
+                  "rule": "axm.or-intr",
+                  "cites": [2]
+                },
+                {
+                  "type": "step",
+                  "expression": "false",
+                  "rule": "axm.not-elim",
+                  "cites": [3, 1]
+                }
+              ]
+            },
+            {
+              "type": "subproof",
+              "assumption": "psi",
+              "substeps": [
+                {
+                  "type": "step",
+                  "expression": "( or phi psi )",
+                  "rule": "axm.or-intr",
+                  "cites": [5]
+                },
+                {
+                  "type": "step",
+                  "expression": "false",
+                  "rule": "axm.not-elim",
+                  "cites": [6, 1]
+                }
+              ]
+            },
+            {
+              "type": "step",
+              "expression": "( not phi )",
+              "rule": "axm.not-intr",
+              "cites": [[2, 4]]
+            },
+            {
+              "type": "step",
+              "expression": "( not psi )",
+              "rule": "axm.not-intr",
+              "cites": [[5, 7]]
+            },
+            {
+              "type": "step",
+              "expression": "( and ( not phi ) ( not psi ) )",
+              "rule": "axm.and-intr",
+              "cites": [8, 9]
+            }
+          ]
+        },
+        {
+          "type": "subproof",
+          "assumption": "( and ( not phi ) ( not psi ) )",
+          "substeps": [
+            {
+              "type": "subproof",
+              "assumption": "( or phi psi )",
+              "substeps": [
+                {
+                  "type": "subproof",
+                  "assumption": "phi",
+                  "substeps": [
+                    {
+                      "type": "step",
+                      "expression": "( not phi )",
+                      "rule": "axm.and-elim",
+                      "cites": [11]
+                    },
+                    {
+                      "type": "step",
+                      "expression": "false",
+                      "rule": "axm.not-elim",
+                      "cites": [13, 14]
+                    }
+                  ]
+                },
+                {
+                  "type": "subproof",
+                  "assumption": "psi",
+                  "substeps": [
+                    {
+                      "type": "step",
+                      "expression": "( not psi )",
+                      "rule": "axm.and-elim",
+                      "cites": [11]
+                    },
+                    {
+                      "type": "step",
+                      "expression": "false",
+                      "rule": "axm.not-elim",
+                      "cites": [16, 17]
+                    }
+                  ]
+                },
+                {
+                  "type": "step",
+                  "expression": "false",
+                  "rule": "axm.or-elim",
+                  "cites": [12, [13, 15], [16, 18]]
+                }
+              ]
+            },
+            {
+              "type": "step",
+              "expression": "( not ( or phi psi ) )",
+              "rule": "axm.not-intr",
+              "cites": [[12, 19]]
+            }
+          ]
+        },
+        {
+          "type": "step",
+          "expression": "( iff ( not ( or phi psi ) ) ( and ( not phi ) ( not psi ) ) )",
+          "rule": "axm.iff-intr",
+          "cites": [
+            [1, 10],
+            [11, 20]
+          ]
+        }
+      ]
+    },
+    {
+      "type": "theorem",
+      "label": "thm.dem-usage-example",
+      "allowedSubs": { "phi": ["x"], "psi": ["x"] },
+      "premises": [
+        { "condition": "( and ( forall x ( not ( or phi psi ) ) ) chi )" }
+      ],
+      "steps": [
+        {
+          "type": "step",
+          "expression": "( and ( forall x ( and ( not phi ) ( not psi ) ) ) chi )",
+          "rule": "eqv.dem",
+          "cites": [1]
+        }
+      ]
     }
   ]
 }

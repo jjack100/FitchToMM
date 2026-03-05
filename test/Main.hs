@@ -4,6 +4,7 @@ import qualified SyntaxProverSpec
 import qualified MMProofSpec
 import qualified NonfreeSpec
 import qualified ReplacementSpec
+import qualified CollectionSpec
 
 main :: IO ()
 main = hspec $ do
@@ -11,3 +12,4 @@ main = hspec $ do
   SyntaxProverSpec.spec
   NonfreeSpec.spec
   ReplacementSpec.spec
+  CollectionSpec.spec

@@ -53,6 +53,7 @@ library
     FitchToMM.Collection
     FitchToMM.Compressed
     FitchToMM.Declarations
+    FitchToMM.Equivalence
     FitchToMM.FitchProof
     FitchToMM.MMProof
     FitchToMM.Matcher
@@ -134,6 +135,7 @@ test-suite FitchToMM-test
     Paths_fitch_to_mm
     ReplacementSpec
     SyntaxProverSpec
+    CollectionSpec
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:

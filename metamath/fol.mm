@@ -799,9 +799,9 @@ ${
   $d x y $. $d y phi $.
   $( Define the uniqueness quantifier $)
   def.unique $a ; ( unique x phi ) :=
-                  ( exists x ( and phi ( forall y ( implies
-                                                    ( sub y x phi ) 
-                                                    ( eq y x ) ) ) ) ) $.
+    ( exists
+      x
+      ( and phi ( forall y ( implies ( sub y x phi ) ( eq y x ) ) ) ) ) $.
 $}
 
 $(
@@ -872,6 +872,15 @@ ${
     SDJQHQOZKTBDHUBBDNZFKSDOLMMSEIZBDHUAEIZUEFKUFBCSEJQUDKUFCEHUGUCGKSEOLLMPHRIZ
     BCUHBIZCEHRJZBIZUCGKUIDEUHBJRHROZKUIBDHUKUEFKUHBOMMLUHCIZBDHUJCIZUEFKUMDEUHC
     JRULKUMCEHUNUCGKUHCOMLLPPK $.
+$}
+
+${
+  thm.eqv-not.1 $e ; |- ( iff phi psi ) $.
+  thm.eqv-not   $p ; ... |- ( iff ( not phi ) ( not psi ) ) $= 
+    ( wff.not wff.iff ctx.append ctx.singleton axm.thin axm.assume axm.not-elim
+    ctx.empty axm.iff-elim-2 axm.not-intr axm.iff-elim-1 axm.iff-intr ) LABEZCE
+    ZFLQRLQGZCSCGZBTBCLQHCGBCFZDISCJMSCHQLQJIKNLRGZBUBBGZCUCBCLRHBGUADIUBBJOUBB
+    HRLRJIKNPI $.
 $}
 
 ${

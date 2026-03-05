@@ -5,7 +5,7 @@ module FitchToMM.FitchProof where
 import qualified Data.Text as T
 import FitchToMM.Declarations (AllowedSubs, Condition (..))
 import FitchToMM.Parser
-import FitchToMM.ProofWriter 
+import FitchToMM.ProofWriter
 
 data Citation = Line Int | Range Int Int
   deriving (Show)
@@ -16,6 +16,8 @@ data FitchStep
   deriving (Show)
 
 data FitchProof = FitchProof T.Text AllowedSubs [Condition] [FitchStep]
+
+data EquivProof = EquivProof T.Text AllowedSubs [FitchStep]
 
 data Justification
   = Reference T.Text
@@ -38,6 +40,9 @@ flattenProof (FitchProof _ _ prems steps) = hyps ++ body
       [ FlatStep (RelContext [sup]) sup Assumption [] [0, i],
         FlatStep (RelContext [sup]) hyp (Premise i) [] [1, i]
       ]
+
+flattenEquivProof :: EquivProof -> [FlatStep]
+flattenEquivProof (EquivProof _ _ steps) = flattenSteps (AbsContext []) [] 0 steps
 
 flattenSteps :: Context -> [Int] -> Int -> [FitchStep] -> [FlatStep]
 flattenSteps context position start fitch =

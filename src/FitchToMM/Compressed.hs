@@ -52,7 +52,7 @@ compressProof :: PackedProof -> CompressedProof
 compressProof (PackedProof thmLabel fact optFHyps dvrs stack mistakes) =
   CompressedProof thmLabel fact optFHyps dvrs otherLabels compressed mistakes
   where
-    (Fact _ mandEHyps mandFHyps _) = fact
+    (Fact _ _ mandEHyps mandFHyps _) = fact
     -- Get the mandatory hypotheses of the proof
     fLabels = map fHypLabel mandFHyps
     eLabels = map (\n -> thmLabel <> "." <> T.show n) [1 .. length mandEHyps]

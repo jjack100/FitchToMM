@@ -8,7 +8,6 @@ module FitchToMM.Nonfree
   )
 where
 
-import qualified Control.Monad.Writer.Strict as W
 import qualified Data.Text as T
 import FitchToMM.Declarations
 import FitchToMM.Matcher
@@ -32,7 +31,7 @@ proveNfCtx allowed x ctx = case unconsCtx ctx of
     nfPrf1 <- proveNfCtx allowed x ctx1
     nfPrf2 <- proveNfWff allowed x ph
     proveMMStep "nf.ctx" [ctx1Prf, ctx2Prf, xPrf, nfPrf1, nfPrf2]
-  Nothing -> W.lift $ Left Inapplicable
+  Nothing -> fromMistake Inapplicable
 
 proveNfWff :: AllowedSubs -> T.Text -> Wff -> ProofWriter
 -- A variable that does not occur is not free
@@ -99,7 +98,7 @@ proveNfWff allowed x (WffSub t y ph)
       nfPrf1 <- proveNfTrm allowed x t
       nfPrf2 <- proveNfWff allowed x ph
       proveMMStep "nf.wff-sub-2" [phPrf, xPrf, yPrf, tPrf, nfPrf1, nfPrf2]
-proveNfWff _ _ _ = W.lift $ Left $ Inapplicable
+proveNfWff _ _ _ = fromMistake Inapplicable
 
 proveNfLst :: AllowedSubs -> T.Text -> [Term] -> ProofWriter
 proveNfLst allowed x l
@@ -117,7 +116,7 @@ proveNfLst allowed x (t : us) = do
   nfPrf1 <- proveNfLst allowed x [t]
   nfPrf2 <- proveNfLst allowed x us
   proveMMStep "nf.lst" [xPrf, tsPrf, usPrf, nfPrf1, nfPrf2]
-proveNfLst _ _ [] = W.lift $ Left $ EmptyList
+proveNfLst _ _ [] = fromMistake EmptyList
 
 proveNfTrm :: AllowedSubs -> T.Text -> Term -> ProofWriter
 -- A variable that does not occur is not free
@@ -151,4 +150,4 @@ proveNfTrm allowed x (TrmSub t1 y t2)
       nfPrf1 <- proveNfTrm allowed x t1
       nfPrf2 <- proveNfTrm allowed x t2
       proveMMStep "nf.trm-sub-2" [xPrf, yPrf, t1Prf, t2Prf, nfPrf1, nfPrf2]
-proveNfTrm _ _ _ = W.lift $ Left $ Inapplicable
+proveNfTrm _ _ _ = fromMistake Inapplicable
