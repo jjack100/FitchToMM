@@ -27,6 +27,8 @@ data Commands
         cmdStyle :: DisplayStyle,
         cmdSExpr :: Bool
       }
+  | ListOptions
+      {cmdInputFile :: FilePath}
 
 execCli :: IO Commands
 execCli = execParser $ info (commandParser <**> helper) briefDesc
@@ -44,7 +46,13 @@ commandParser =
           "show"
           ( info
               (showParser <**> helper)
-              (progDesc "Display a specific theorem")
+              (progDesc "Display a specific item")
+          )
+        <> command
+          "list"
+          ( info
+              (listParser <**> helper)
+              (progDesc "List the items of a collection")
           )
     )
 
@@ -85,3 +93,6 @@ styleParser :: Parser DisplayStyle
 styleParser =
   flag Fitch Fitch (long "fitch" <> short 'f' <> help "Show proof in Fitch-style (default)")
     <|> flag Fitch Sequent (long "sequent" <> short 's' <> help "Show proof in sequent style")
+
+listParser :: Parser Commands
+listParser = ListOptions <$> strArgument (metavar "INPUT_FILE")

@@ -12,7 +12,7 @@ import Data.Foldable (traverse_)
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Display
-import FitchToMM.Collection (Collection (..), Item (..), findItem)
+import FitchToMM.Collection (Collection (..), Item (..), findItem, itemLabel)
 import FitchToMM.Compressed (compressProof, packProof)
 import FitchToMM.Declarations
 import FitchToMM.FitchProof (EquivProof (EquivProof), FitchProof (FitchProof), flattenEquivProof, flattenProof)
@@ -45,6 +45,7 @@ main = do
         outputFile
     (ShowOptions _ label dispStyle asSExpr) ->
       displayItem asSExpr dispStyle parsedCollection label
+    (ListOptions _) -> listCollection parsedCollection
 
 genDatabase :: Collection -> ProofFormat -> FilePath -> IO ()
 genDatabase (Collection title _ items) format outputFile = do
@@ -147,6 +148,9 @@ displayEquiv asSExpr dispStyle theorem = do
   TIO.putStrLn $ case dispStyle of
     Fitch -> prettyFitch asSExpr (FitchProof label allowed [] steps)
     Sequent -> prettyFlat asSExpr label allowed (flattenEquivProof theorem)
+
+listCollection :: Collection -> IO ()
+listCollection (Collection _ _ items) = mapM_ (TIO.putStrLn . itemLabel) items
 
 try :: Maybe a -> T.Text -> IO a
 try result msg = maybe (errorOut msg) pure result

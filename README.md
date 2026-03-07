@@ -58,7 +58,7 @@ The `show` subcommand can be used to display a specific proof:
 Usage: fitch2mm show INPUT_FILE (-l|--label ITEM_LABEL) 
                      [(-f|--fitch) | (-s|--sequent)] [--sexpr]
 
-  Display a specific theorem
+  Display a specific item
 
 Available options:
   -l,--label ITEM_LABEL    Label of the item to display

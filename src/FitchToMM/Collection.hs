@@ -1,6 +1,13 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module FitchToMM.Collection (Collection (..), Item (..), fromList, findItem) where
+module FitchToMM.Collection
+  ( Collection (..),
+    Item (..),
+    fromList,
+    findItem,
+    itemLabel,
+  )
+where
 
 import Data.Either (fromRight)
 import Data.List (find, mapAccumL)
