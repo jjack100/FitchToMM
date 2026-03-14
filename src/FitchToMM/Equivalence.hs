@@ -14,6 +14,8 @@ import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.SyntaxProver
 import Data.Maybe (isJust)
+import FitchToMM.Context
+import FitchToMM.Variable
 
 proveEquiv :: EquivFact -> Label -> Context -> Wff -> Wff -> ProofWriter
 proveEquiv eqv eqvLabel (AbsContext []) lhs rhs

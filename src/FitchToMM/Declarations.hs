@@ -28,15 +28,14 @@ module FitchToMM.Declarations
 where
 
 import Control.Monad (foldM, guard)
-import Data.Containers.ListUtils (nubOrd)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
-import FitchToMM.Matcher (varsInWff)
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import Text.Parsec (ParseError)
-import Data.Foldable (foldMap')
+import FitchToMM.Context
+import FitchToMM.Variable
 
 data DeclMap = DeclMap (M.Map Label Declaration) (M.Map T.Text SymbolType)
 
@@ -52,8 +51,6 @@ data Fact = Fact Context Wff [Condition] [FHyp] [DVR]
 -- discharged in the application of the fact it is conditioning
 data Condition = Condition (Maybe Wff) Wff
   deriving (Show)
-
-type AllowedSubs = T.Text -> [T.Text]
 
 data Definition = Definition Definiendum Definiens [FHyp] [DVR]
 
@@ -126,32 +123,6 @@ mkDef definiendum definiens allowedSubs lang = do
   let fHyps = sortVars $ S.elems $ varsInWff definiendumWff <> varsInWff definiensWff
       dvrs = inferDVRs allowedSubs definiendumWff <> inferDVRs allowedSubs definiensWff
   return $ Definition definiendumWff definiensWff fHyps dvrs
-
-inferDVRs :: AllowedSubs -> Wff -> [DVR]
-inferDVRs allowed wff = nubOrd $ setvarDVRs <> wffDVRs [] wff
-  where
-    fHyps = S.toList $ varsInWff wff
-    setvars = filter isSetvar fHyps
-    -- Include disjoint variable restrictions between all setvars (that is, we
-    -- do not support so-called "bundling" of setvars).
-    setvarDVRs = [mkDVR v1 v2 | v1 <- setvars, v2 <- setvars, v1 < v2]
-    -- Include disjoint variable restrictions for each metavariable within the
-    -- scope of a quantifier or substitution if the bound variable is not
-    -- explicitly allowed to occur in the metavariable
-    wffDVRs bound (WffBinOp _ lhs rhs) = wffDVRs bound lhs <> wffDVRs bound rhs
-    wffDVRs bound (WffNot expr) = wffDVRs bound expr
-    wffDVRs bound (WffMetavar m) = [mkDVR (WffHyp m) (VarHyp v) | v <- bound, v `notElem` allowed m]
-    wffDVRs bound (WffQnt _ v expr) = wffDVRs (v : bound) expr
-    wffDVRs bound (WffAtom _ args) = foldMap' (trmDVRs bound) args
-    wffDVRs bound (WffSub t v expr) = trmDVRs bound t <> wffDVRs (v : bound) expr
-    wffDVRs _ WffTrue = []
-    wffDVRs _ WffFalse = []
-    trmDVRs bound (TrmMetavar m) = [mkDVR (TrmHyp m) (VarHyp v) | v <- bound, v `notElem` allowed m]
-    trmDVRs bound (TrmFunc _ args) = foldMap' (trmDVRs bound) args
-    trmDVRs bound (TrmSub t v expr) = trmDVRs bound t <> trmDVRs (v : bound) expr
-    trmDVRs _ (TrmConst _) = []
-    trmDVRs _ (TrmVar _) = []
-
 
 insertDecl :: DeclMap -> Label -> Declaration -> DeclMap
 insertDecl (DeclMap declMap lang) label decl = DeclMap (M.insert label decl declMap) lang

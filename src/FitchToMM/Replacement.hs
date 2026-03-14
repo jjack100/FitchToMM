@@ -10,14 +10,11 @@ where
 
 import Control.Monad (guard, zipWithM)
 import Data.Monoid (First (..))
-import qualified Data.Text as T
-import FitchToMM.Declarations (AllowedSubs)
 import FitchToMM.Nonfree
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.SyntaxProver
-
-type Var = T.Text
+import FitchToMM.Variable
 
 -- Given two formulae P and Q, and a variable x, determine what (if any) term
 -- t exists such that P replaces x in Q with t

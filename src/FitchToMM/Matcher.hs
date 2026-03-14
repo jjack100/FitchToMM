@@ -23,12 +23,12 @@ module FitchToMM.Matcher
 where
 
 import Control.Monad
-import Data.Foldable
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Text as T
 import FitchToMM.Parser
-import FitchToMM.ProofWriter
+import FitchToMM.Variable
+import FitchToMM.Context
 
 data Expression = ExprWff Wff | ExprTrm Term | ExprVar T.Text | ExprCtx Context
   deriving (Show, Eq, Ord)
@@ -93,8 +93,8 @@ checkDisjoint :: Substitution -> DVR -> Maybe (S.Set DVR)
 checkDisjoint (Substitution u) (DVR v1 v2)
   | Just e1 <- u M.!? fHypName v1,
     Just e2 <- u M.!? fHypName v2 = do
-      let vars1 = varsIn e1
-      let vars2 = varsIn e2
+      let vars1 = varsInExpr e1
+      let vars2 = varsInExpr e2
       guard $ S.disjoint vars1 vars2
       return $ S.map (uncurry mkDVR) (S.cartesianProduct vars1 vars2)
 checkDisjoint _ _ = Just S.empty
@@ -138,33 +138,8 @@ lookupCtx metavar (Substitution u)
   | otherwise = Nothing
 
 -- Find the set of all variables used in an expression
-varsIn :: Expression -> S.Set FHyp
-varsIn (ExprWff wff) = varsInWff wff
-varsIn (ExprTrm trm) = varsInTrm trm
-varsIn (ExprVar var) = S.singleton $ VarHyp var
-varsIn (ExprCtx ctx) = varsInCtx ctx
-
-varsInCtx :: Context -> S.Set FHyp
-varsInCtx (RelContext ctx) = S.insert (CtxHyp "...") (foldMap' varsInWff ctx)
-varsInCtx (AbsContext ctx) = foldMap' varsInWff ctx
-
-varsInWff :: Wff -> S.Set FHyp
-varsInWff (WffBinOp _ lhs rhs) = varsInWff lhs <> varsInWff rhs
-varsInWff (WffNot wff) = varsInWff wff
-varsInWff WffTrue = S.empty
-varsInWff WffFalse = S.empty
-varsInWff (WffQnt _ x wff) = S.insert (VarHyp x) (varsInWff wff)
-varsInWff (WffAtom _ args) = varsInLst args
-varsInWff (WffMetavar var) = S.singleton $ WffHyp var
-varsInWff (WffSub trm x wff) =
-  S.insert (VarHyp x) (varsInTrm trm <> varsInWff wff)
-
-varsInLst :: [Term] -> S.Set FHyp
-varsInLst = foldMap' varsInTrm
-
-varsInTrm :: Term -> S.Set FHyp
-varsInTrm (TrmVar x) = S.singleton $ VarHyp x
-varsInTrm (TrmFunc _ args) = varsInLst args
-varsInTrm (TrmConst _) = S.empty
-varsInTrm (TrmMetavar var) = S.singleton $ TrmHyp var
-varsInTrm (TrmSub t1 x t2) = (varsInTrm t1) <> (S.singleton $ VarHyp x) <> (varsInTrm t2)
+varsInExpr :: Expression -> S.Set FHyp
+varsInExpr (ExprWff wff) = varsInWff wff
+varsInExpr (ExprTrm trm) = varsInTrm trm
+varsInExpr (ExprVar var) = S.singleton $ VarHyp var
+varsInExpr (ExprCtx ctx) = varsInCtx ctx

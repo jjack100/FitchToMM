@@ -32,8 +32,8 @@ import qualified FitchToMM.Declarations as D
 import qualified FitchToMM.FitchProof as F
 import qualified FitchToMM.MMProof as MM
 import qualified FitchToMM.Parser as P
-import qualified FitchToMM.ProofWriter as PW
 import GHC.Generics
+import qualified FitchToMM.Variable as V
 
 data Collection = Collection
   { title :: T.Text,
@@ -305,14 +305,14 @@ parseProofStep l (Subproof assump stps) = do
   parsedSteps <- mapM (parseProofStep l) stps
   return $ F.FitchSubproof parsedAssump parsedSteps
 
-parseDVR :: (FHyp, FHyp) -> PW.DVR
-parseDVR (x, y) = PW.mkDVR (parseFHyp x) (parseFHyp y)
+parseDVR :: (FHyp, FHyp) -> V.DVR
+parseDVR (x, y) = V.mkDVR (parseFHyp x) (parseFHyp y)
 
-parseFHyp :: FHyp -> PW.FHyp
-parseFHyp (VarHyp txt) = PW.VarHyp txt
-parseFHyp (TrmHyp txt) = PW.TrmHyp txt
-parseFHyp (WffHyp txt) = PW.WffHyp txt
-parseFHyp (CtxHyp txt) = PW.CtxHyp txt
+parseFHyp :: FHyp -> V.FHyp
+parseFHyp (VarHyp txt) = V.VarHyp txt
+parseFHyp (TrmHyp txt) = V.TrmHyp txt
+parseFHyp (WffHyp txt) = V.WffHyp txt
+parseFHyp (CtxHyp txt) = V.CtxHyp txt
 
 parsePremise :: P.Language -> Premise -> Either T.Text D.Condition
 parsePremise l (Premise (Just sup) cond) = do

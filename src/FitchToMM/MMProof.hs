@@ -18,6 +18,8 @@ import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.Replacement
 import FitchToMM.SyntaxProver
+import FitchToMM.Variable
+import FitchToMM.Context
 
 data MMProof
   = MMProof

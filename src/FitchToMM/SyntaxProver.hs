@@ -18,10 +18,11 @@ module FitchToMM.SyntaxProver
 where
 
 import qualified Data.Text as T
-import FitchToMM.Declarations (AllowedSubs)
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.Matcher 
+import FitchToMM.Context (Context(..))
+import FitchToMM.Variable
 
 proveWff :: Wff -> ProofWriter
 -- Handle binary connectives

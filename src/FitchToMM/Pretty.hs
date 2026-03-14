@@ -13,17 +13,17 @@ module FitchToMM.Pretty
   )
 where
 
-import Data.Algorithm.MaximalCliques (getMaximalCliques)
-import Data.List (find, sortOn, unfoldr, (\\))
-import Data.Ord
+import Data.List ((\\))
 import qualified Data.Set as S
 import qualified Data.Text as T
 import FitchToMM.Compressed
+import FitchToMM.Context
 import FitchToMM.Declarations (Condition (..), Definition (..))
 import FitchToMM.MMProof
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.SyntaxProver (constStep, funcStep, prdStep)
+import FitchToMM.Variable
 import Prettyprinter
 
 printProof :: MMProof -> IO ()
@@ -199,29 +199,3 @@ prettyQnt QntUnique = "unique"
 
 prettySExpr :: [Doc a] -> Doc a
 prettySExpr items = lparen <+> align (sep items) <+> rparen
-
-type CompoundDVR = S.Set FHyp
-
-compoundDVRs :: [FHyp] -> [DVR] -> [CompoundDVR]
-compoundDVRs fhyps dvrs = groups ++ S.toList ungrouped
-  where
-    groups = unfoldr go S.empty
-    coveredDVRs = S.unions $ map (cover . S.toList) groups
-    remaining = S.difference dvrSet coveredDVRs
-    ungrouped = S.map (\(DVR l r) -> S.fromList [l, r]) remaining
-
-    dvrSet = S.fromList dvrs
-
-    cliques =
-      sortOn (Down . length) $
-        filter (\x -> length x >= 3) $
-          getMaximalCliques (\l r -> (mkDVR l r) `S.member` dvrSet) fhyps
-
-    cover :: [FHyp] -> S.Set DVR
-    cover xs = S.fromList [mkDVR x y | x <- xs, y <- xs, x < y]
-
-    go :: S.Set DVR -> Maybe (CompoundDVR, S.Set DVR)
-    go covered = do
-      grouping <- find (\x -> covered `S.disjoint` cover x) cliques
-      let newCover = covered <> cover grouping
-      return (S.fromList grouping, newCover)

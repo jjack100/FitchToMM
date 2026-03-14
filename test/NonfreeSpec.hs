@@ -21,6 +21,8 @@ import Prettyprinter.Render.Text
 import Test.Hspec
 import Test.Hspec.QuickCheck
 import Test.QuickCheck
+import FitchToMM.Context
+import FitchToMM.Variable
 
 spec :: Spec
 spec = describe "Nonfreeness Prover" $ do

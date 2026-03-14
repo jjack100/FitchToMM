@@ -18,6 +18,7 @@ import qualified Data.Vector.Unboxed as V
 import FitchToMM.Declarations (Fact (..))
 import FitchToMM.MMProof (MMProof (..))
 import FitchToMM.ProofWriter
+import FitchToMM.Variable
 
 data PackedStep = PackedStep (Maybe Int) T.Text | Backreference Int | UnknownStep
   deriving (Show)

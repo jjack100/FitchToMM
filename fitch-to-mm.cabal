@@ -52,6 +52,7 @@ library
   exposed-modules:
     FitchToMM.Collection
     FitchToMM.Compressed
+    FitchToMM.Context
     FitchToMM.Declarations
     FitchToMM.Equivalence
     FitchToMM.FitchProof
@@ -64,6 +65,7 @@ library
     FitchToMM.Replacement
     FitchToMM.Serialize
     FitchToMM.SyntaxProver
+    FitchToMM.Variable
 
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:

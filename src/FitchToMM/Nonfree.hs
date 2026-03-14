@@ -14,6 +14,8 @@ import FitchToMM.Matcher
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
 import FitchToMM.SyntaxProver
+import FitchToMM.Context
+import FitchToMM.Variable
 
 proveNfCtx :: AllowedSubs -> T.Text -> Context -> ProofWriter
 proveNfCtx allowed x ctx

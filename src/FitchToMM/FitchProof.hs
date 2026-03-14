@@ -5,7 +5,7 @@ module FitchToMM.FitchProof where
 import qualified Data.Text as T
 import FitchToMM.Declarations (AllowedSubs, Condition (..))
 import FitchToMM.Parser
-import FitchToMM.ProofWriter
+import FitchToMM.Context
 
 data Citation = Line Int | Range Int Int
   deriving (Show)
