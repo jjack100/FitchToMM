@@ -5,6 +5,7 @@ import qualified MMProofSpec
 import qualified NonfreeSpec
 import qualified ReplacementSpec
 import qualified CollectionSpec
+import qualified DvrSpec
 
 main :: IO ()
 main = hspec $ do
@@ -13,3 +14,4 @@ main = hspec $ do
   NonfreeSpec.spec
   ReplacementSpec.spec
   CollectionSpec.spec
+  DvrSpec.spec
