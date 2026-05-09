@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : FitchToMM.Equivalence
+-- Description : Proofs of logical equivalence
 module FitchToMM.Equivalence
   ( EquivProof (..),
     proveEquiv,
@@ -17,6 +20,7 @@ import Data.Maybe (isJust)
 import FitchToMM.Context
 import FitchToMM.Variable
 
+-- | Produce a proof that two WFFs are logically equivalent
 proveEquiv :: EquivFact -> Label -> Context -> Wff -> Wff -> ProofWriter
 proveEquiv eqv eqvLabel (AbsContext []) lhs rhs
   | Just (fHyps, dvrs) <- matchEqv eqv lhs rhs = do

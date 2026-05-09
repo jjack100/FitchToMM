@@ -1,6 +1,25 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module FitchToMM.MMProof (Fact (..), MMProof (..), fromFitchProof, fromEquivProof) where
+-- |
+-- Module      : FitchToMM.MMProof
+-- Description : Conversion from Fitch proofs to Metamath proofs
+--
+-- This module implements the core proof conversion logic, transforming abstract
+-- Fitch proofs into Metamath proofs.
+--
+-- This is implemented by constructing a table of subproofs corresponding to each
+-- line. Lines that cite previous lines can then use the table to look up their
+-- respective subproofs to construct the new subproof at that step.
+--
+-- Some built-in rules require handling as special cases (such as the intelim rules
+-- for quantifiers that come with side-conditions).
+module FitchToMM.MMProof
+  ( MMProof (..),
+    MistakesList,
+    fromFitchProof,
+    fromEquivProof,
+  )
+where
 
 import Control.Monad
 import Data.Foldable (asum)
@@ -9,6 +28,7 @@ import Data.Maybe
 import qualified Data.Set as S
 import qualified Data.Text as T
 import qualified Data.Vector as V
+import FitchToMM.Context
 import FitchToMM.Declarations
 import FitchToMM.Equivalence (proveEquiv)
 import FitchToMM.FitchProof
@@ -19,26 +39,36 @@ import FitchToMM.ProofWriter
 import FitchToMM.Replacement
 import FitchToMM.SyntaxProver
 import FitchToMM.Variable
-import FitchToMM.Context
 
+-- | A Metamath proof
 data MMProof
   = MMProof
-  { proofLabel :: T.Text,
-    -- The "fact" being proved should contain what is necessary for another proof to
-    -- reference it (only mandatory hypotheses and disjoint variable restrictions)
+  { -- | The label of the theorem or lemma being proved
+    proofLabel :: T.Text,
+    -- | The fact (statement, hypotheses, restrictions), containing the
+    -- information needed for other proofs to reference this one.
     proofFact :: Fact,
-    -- All floating hypotheses and disjoint variable restrictions (including optional ones)
+    -- | All floating hypotheses used in the proof.
+    --
+    -- Includes both mandatory and optional hypotheses.
     proofFHyps :: [FHyp],
+    -- | All disjoint variable restrictions incurred by the proof.
     proofDvrs :: [DVR],
-    -- The stack of labels in reverse Polish notation
+    -- | The proof steps in reverse Polish notation.
     proofStack :: RpnStack,
+    -- | Mistakes encountered during proof construction, with line numbers.
+    --
+    -- Non-empty list indicates proof validation failures.
     proofMistakes :: MistakesList
   }
   deriving (Show)
 
--- List of mistakes paired with the (0-based) line numbers at which they occur
+-- | Mistakes paired with their 0-based line numbers in the original proof.
 type MistakesList = [(Int, Mistake)]
 
+-- | Convert a Fitch proof to Metamath format.
+--
+-- Returns 'Nothing' if the proof is empty.
 fromFitchProof :: DeclMap -> FitchProof -> Maybe MMProof
 fromFitchProof decls prf@(FitchProof label allowed prems steps) = do
   guard $ not $ null steps
@@ -51,6 +81,10 @@ fromFitchProof decls prf@(FitchProof label allowed prems steps) = do
     FlatStep _ conclusion _ _ _ = last flat
     mandFHyps = foldMap varsInCond prems <> varsInWff conclusion <> (S.singleton $ CtxHyp "...")
 
+-- | Convert an equivalence proof to Metamath format.
+--
+-- An equivalence proof demonstrates the logical equivalence of two formulas.
+-- Returns 'Nothing' if the proof is empty.
 fromEquivProof :: DeclMap -> EquivProof -> Maybe MMProof
 fromEquivProof decls prf@(EquivProof label allowed steps) = do
   guard $ not $ null steps
@@ -97,6 +131,7 @@ proveFlatSteps decls allowed flatSteps = do
     mistakesList = mapMaybe sequence (V.toList mistakes)
 
     -- Function for generating the proof at each step
+    -- Handles premises, assumptions, reiteration, and rule references
     step :: Int -> FlatStep -> ProofWriter
     -- The proof should not end with any undischarged assumptions
     step i (FlatStep ctx _ _ _ _)
@@ -170,7 +205,14 @@ proveFlatSteps decls allowed flatSteps = do
       | Just eqv <- lookupEqv ref = proveEqv eqv ref i fs
       | otherwise = fromMistake UnrecognizedFact
 
-    -- Prove the introduction or elimination of a definition
+    -- Prove introduction or elimination of a definition.
+    --
+    -- A definition rule acts as a biconditional, allowing either direction:
+    --
+    -- - Introduction: prove the definiendum from the definiens
+    -- - Elimination: prove the definiens from the definiendum
+    --
+    -- The function tries both directions and takes the first that succeeds.
     proveDef :: (Definiendum -> Definiens -> ProofWriter) -> Int -> FlatStep -> ProofWriter
     proveDef proveDefStmt i (FlatStep ctx wff _ [citation] _) = do
       (FlatStep _ cited _ _ _) <- lift $ lookupStep i ctx citation
@@ -187,6 +229,14 @@ proveFlatSteps decls allowed flatSteps = do
           proveMMStep label $ fHypPrfs ++ [defSubPrf, citedPrf]
     proveDef _ _ _ = fromMistake BadCiteCount
 
+    -- Prove equivalence using an equivalence fact.
+    --
+    -- An equivalence allows either direction of biconditional:
+    --
+    -- - Forward: prove the target from the cited step
+    -- - Backward: prove the cited step from the target
+    --
+    -- Tries both directions and takes the first successful proof.
     proveEqv :: EquivFact -> Label -> Int -> FlatStep -> ProofWriter
     proveEqv eqv ref i (FlatStep ctx wff _ [citation] _) = do
       FlatStep _ citedWff _ _ _ <- lift $ lookupStep i ctx citation
@@ -203,14 +253,16 @@ proveFlatSteps decls allowed flatSteps = do
       alts [prf1, prf2]
     proveEqv _ _ _ _ = fromMistake BadCiteCount
 
-    -- Try several possible references, and take the first that succeeds
+    -- Try multiple alternative references for a rule.
     choice :: Int -> FlatStep -> [T.Text] -> ProofWriter
     choice i (FlatStep ctx expr _ cites pos) choices =
       let apply jus = step i (FlatStep ctx expr jus cites pos)
           results = map (apply . Reference) choices
        in alts results
 
-    -- Lookup a past step given a citation
+    -- Retrieve a past proof step by citation
+    -- Updates the context to match the citing proof's context.
+    -- Returns a mistake if the citation is invalid (non-existent, later in proof, etc.).
     lookupStep :: Int -> Context -> Citation -> Either Mistake FlatStep
     lookupStep i ctx cite@(Line line)
       | Just err <- checkAccessibility flatProof i cite = Left err
@@ -222,7 +274,8 @@ proveFlatSteps decls allowed flatSteps = do
       | Just err <- checkAccessibility flatProof i cite = Left err
       | otherwise = Right $ flatProof V.! to
 
-    -- Lookup the proof of a past step given a citation
+    -- Retrieve the proof of a past step by citation, applying thinning if
+    -- the step's original context is broader than needed.
     lookupProof :: Int -> Context -> Citation -> ProofWriter
     lookupProof i ctx cite@(Line line)
       | Just err <- checkAccessibility flatProof i cite = fromMistake err
@@ -243,13 +296,22 @@ proveFlatSteps decls allowed flatSteps = do
     lookupDef = findDefinition decls
     lookupEqv = findEquiv decls
 
--- Apply disjoint variable conditions
+-- Apply disjoint variable restrictions
+-- Checks that the substitution respects the given DV restrictions,
+-- and registers any restrictions that must appear in the proof.
 applyDVRs :: Substitution -> [DVR] -> PropWriter
 applyDVRs sub fromDVRs = do
   toDVRs <- try (checkDisjoints sub fromDVRs) Inapplicable
   mapM_ applyDVR toDVRs
 
--- Check if a line or subproof is accessible to (able to be legitimately cited by) a given line
+-- Check if a proof step is accessible to a citing line.
+--
+-- Accessibility rules:
+--
+-- - Line steps: previous lines only; cannot cite self or discharged steps
+-- - Subproof ranges: must be a valid subproof; cannot cross nesting boundaries
+--
+-- This enforces the structure of the proof.
 checkAccessibility :: V.Vector FlatStep -> Int -> Citation -> Maybe Mistake
 checkAccessibility steps i (Line line)
   | isNothing (steps V.!? line) = Just CitesNonexistent
@@ -284,6 +346,7 @@ checkAccessibility table i (Range from to)
       Just CitesDischarged
   | otherwise = Nothing
 
+-- Prove universal quantifier introduction (forall-intr).
 proveForallI :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveForallI allowed sub = do
   -- We should already know the substitutions for φ,ψ,x
@@ -306,6 +369,7 @@ proveForallI allowed sub = do
         return $ (fullSub, [nfPrf1, nfPrf2, rPrf])
   asum $ map tryCandidate $ S.toList candidates
 
+-- Prove existential quantifier introduction (exists-intro).
 proveExistsI :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveExistsI allowed sub = do
   -- We should already know the substitutions for φ,ψ,x
@@ -318,6 +382,7 @@ proveExistsI allowed sub = do
   let rPrf = proveReplWff allowed phi x psi trm_1
   return (fullSub, [rPrf])
 
+-- Prove universal quantifier elimination (forall-elim).
 proveForallE :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveForallE allowed sub = do
   -- We should already know the substitutions for φ,ψ,x
@@ -330,6 +395,7 @@ proveForallE allowed sub = do
   let rPrf = proveReplWff allowed psi x phi trm_1
   return (fullSub, [rPrf])
 
+-- Prove existential quantifier elimination (exists-elim).
 proveExistsE :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveExistsE allowed sub = do
   -- We should already know the substitutions for φ,ψ,χ,x
@@ -349,6 +415,7 @@ proveExistsE allowed sub = do
       rPrf = proveReplWff allowed psi x phi aTrm
   return (fullSub, [nfPrf1, nfPrf2, nfPrf3, rPrf])
 
+-- Prove equality elimination (eq-elim).
 proveEqE :: AllowedSubs -> Substitution -> Maybe (Substitution, [ProofWriter])
 proveEqE allowed sub = do
   -- We should already know the substitutions for φ,ψ,trm_1,trm_2
@@ -363,6 +430,7 @@ proveEqE allowed sub = do
   let rPrf2 = proveReplWff allowed psi "_x" chi trm_2
   return (fullSub, [rPrf1, rPrf2])
 
+-- Prove the substitution definition for formulas
 proveDefSubWff :: AllowedSubs -> Wff -> Wff -> ProofWriter
 proveDefSubWff allowedSubs definiendum definiens = do
   sub1 <- try (definiendum `matchTo` WffSub (TrmMetavar "trm_1") "x" (WffMetavar "phi")) Inapplicable
@@ -379,6 +447,7 @@ proveDefSubWff allowedSubs definiendum definiens = do
   -- Prove the definition statement
   proveMMStep "def.sub-wff" (fHypPrfs ++ [replPrf])
 
+-- Prove the substitution definition for terms
 proveDefSubTrm :: AllowedSubs -> Wff -> Wff -> ProofWriter
 proveDefSubTrm allowedSubs definiendum definiens = do
   sub1 <- try (definiendum `matchTo` (WffAtom "eq" [TrmMetavar "trm_1", TrmSub (TrmMetavar "trm_4") "x" (TrmMetavar "trm_3")])) Inapplicable
@@ -396,7 +465,8 @@ proveDefSubTrm allowedSubs definiendum definiens = do
   -- Prove the definition statement
   proveMMStep "def.sub-trm" (fHypPrfs ++ [replPrf])
 
--- Tries to thin a step to match a given context
+-- Thin a proof to match a target context.
+-- Returns the proof unchanged if contexts match.
 proveThin :: Context -> FlatStep -> RpnStack -> ProofWriter
 proveThin toCtx (FlatStep fromCtx ps _ _ _) basePrf = case extras fromCtx toCtx of
   Just [] -> pure basePrf
@@ -412,7 +482,8 @@ proveThin toCtx (FlatStep fromCtx ps _ _ _) basePrf = case extras fromCtx toCtx 
     extras _ _ = Nothing
     stripSuffix x y = reverse <$> stripPrefix (reverse x) (reverse y)
 
--- Check that a cited step matches an essential hypothesis, and if so return the substitution
+-- Verify that a proof step matches an essential hypothesis.
+-- If a valid substitution is found, it is returned, otherwise returns nothing
 verifyEHyp :: FlatStep -> Condition -> Maybe Substitution
 verifyEHyp (FlatStep ctx wff _ _ _) (Condition Nothing hyp) = do
   let ctxSub = singletonCtx ctx
@@ -427,11 +498,14 @@ verifyEHyp (FlatStep ctx wff _ _ _) (Condition (Just sup) hyp) =
       mergeFold [ctxSub, supSub, hypSub]
     Nothing -> Nothing
 
+-- Find all variables in a condition
 varsInCond :: Condition -> S.Set FHyp
 varsInCond (Condition (Just sup) hyp) = varsInWff sup <> varsInWff hyp
 varsInCond (Condition Nothing hyp) = varsInWff hyp
 
--- Identify the mandatory disjoint variable restrictions (those that apply to mandatory vars)
+-- Extract mandatory disjoint variable restrictions (DVRs).
+-- A DVR is mandatory if the floating hypotheses for both variables
+-- involved are mandatory.
 getMandDVRs :: S.Set FHyp -> S.Set DVR -> S.Set DVR
 getMandDVRs mandFHyps allDVRs =
   S.filter

@@ -1,12 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : FitchToMM.SyntaxProver
+-- Description : Generates Metamath proofs for syntactic structures
+--
+-- This module provides functions for generating Metamath proofs that syntactic
+-- structures are well-formed.
 module FitchToMM.SyntaxProver
   ( proveWff,
     proveCtx,
     proveTrm,
     qntStep,
     proveLst,
-    provePrependLst,
+   -- provePrependLst,
     funcStep,
     prdStep,
     constStep,
@@ -24,6 +30,7 @@ import FitchToMM.Matcher
 import FitchToMM.Context (Context(..))
 import FitchToMM.Variable
 
+-- | Generate a syntax proof for a well-formed formula (WFF).
 proveWff :: Wff -> ProofWriter
 -- Handle binary connectives
 proveWff (WffBinOp op ph ps) = do
@@ -61,6 +68,7 @@ proveWff (WffSub t x ph) = do
   tPrf <- proveTrm t
   proveMMStep "wff.sub" [phPrf, xPrf, tPrf]
 
+-- | Generate a syntax proof for a list of terms.
 proveLst :: [Term] -> ProofWriter
 proveLst [term] = do
   trmPrf <- proveTrm term
@@ -71,16 +79,7 @@ proveLst (term : terms) = do
   proveMMStep "lst.prepend" [trmPrf, lstPrf]
 proveLst _ = fromMistake EmptyList
 
-provePrependLst :: [Term] -> ProofWriter
-provePrependLst [term] = do
-  trmPrf <- proveTrm term
-  proveMMStep "lst.singleton" [trmPrf]
-provePrependLst (term : terms) = do
-  trmPrf <- proveTrm term
-  lstPrf <- provePrependLst terms
-  proveMMStep "lst.append" [trmPrf, lstPrf]
-provePrependLst _ = fromMistake EmptyList
-
+-- | Generate a Metamath proof for a term.
 proveTrm :: Term -> ProofWriter
 proveTrm (TrmVar x) = do
   varPrf <- proveVar x
@@ -97,6 +96,7 @@ proveTrm (TrmSub t1 x t2) = do
   t2Prf <- proveTrm t2
   proveMMStep "trm.sub" [xPrf, t1Prf, t2Prf]
 
+-- | Generate a syntax proof for a context.
 proveCtx :: Context -> ProofWriter
 proveCtx (RelContext []) = proveEllipsis
 proveCtx (AbsContext []) = proveMMStep "ctx.empty" []
@@ -112,6 +112,7 @@ proveCtxAppend toCtx wffs phi = do
   phPrf <- proveWff phi
   proveMMStep "ctx.append" [ctxPrf, phPrf]
 
+-- | Generate a syntax proof for a floating hypothesis.
 proveFHyp :: Substitution -> FHyp -> ProofWriter
 proveFHyp sub (WffHyp hyp) | Just wff <- lookupWff hyp sub = proveWff wff
 proveFHyp sub (VarHyp hyp) | Just var <- lookupVar hyp sub = proveVar var
@@ -119,9 +120,11 @@ proveFHyp sub (TrmHyp hyp) | Just trm <- lookupTrm hyp sub = proveTrm trm
 proveFHyp sub (CtxHyp hyp) | Just ctx <- lookupCtx hyp sub = proveCtx ctx
 proveFHyp _ hyp = proveMetavar $ markInternal hyp
 
+-- | Check whether a variable occurs in a context.
 occursInCtx :: AllowedSubs -> T.Text -> Context -> Bool
 occursInCtx a x ctx = any (occursInWff a x) (ctxWffs ctx)
 
+-- | Check whether a variable occurs in a well-formed formula.
 occursInWff :: AllowedSubs -> T.Text -> Wff -> Bool
 occursInWff a x (WffBinOp _ lhs rhs) = occursInWff a x lhs || occursInWff a x rhs
 occursInWff a x (WffNot wff) = occursInWff a x wff
@@ -132,6 +135,7 @@ occursInWff a x (WffSub trm var wff) = x == var || occursInTrm a x trm || occurs
 occursInWff _ _ WffTrue = False
 occursInWff _ _ WffFalse = False
 
+-- | Check whether a variable occurs in a term.
 occursInTrm :: AllowedSubs -> T.Text -> Term -> Bool
 occursInTrm _ x (TrmVar y) = x == y
 occursInTrm a x (TrmFunc _ args) = any (occursInTrm a x) args
@@ -139,16 +143,20 @@ occursInTrm _ _ (TrmConst _) = False
 occursInTrm a x (TrmMetavar var) = x `elem` a var
 occursInTrm a x (TrmSub t1 var t2) = occursInTrm a x t1 || x == var || occursInTrm a x t2
 
+-- | Create a Metamath proof step for a quantifier.
 qntStep :: Quantifier -> RpnStep
 qntStep QntForall = RpnStep 0 "qnt.forall"
 qntStep QntExists = RpnStep 0 "qnt.exists"
 qntStep QntUnique = RpnStep 0 "qnt.unique"
 
+-- | Create a Metamath proof step for a function.
 funcStep :: T.Text -> RpnStep
 funcStep funcName = RpnStep 0 $ "func." <> funcName
 
+-- | Create a Metamath proof step for a predicate.
 prdStep :: T.Text -> RpnStep
 prdStep prdName = RpnStep 0 $ "prd." <> prdName
 
+-- | Create a Metamath proof step for a term constant.
 constStep :: T.Text -> RpnStep
 constStep constName = RpnStep 0 $ "trm." <> constName

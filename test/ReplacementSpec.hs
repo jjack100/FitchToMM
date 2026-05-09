@@ -5,11 +5,11 @@ module ReplacementSpec (spec) where
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Expectations
-import FitchToMM.Declarations
 import FitchToMM.Parser
 import FitchToMM.Pretty
 import FitchToMM.ProofWriter
 import FitchToMM.Replacement
+import FitchToMM.Variable
 import Paths_fitch_to_mm
 import Prettyprinter
 import Prettyprinter.Render.Text

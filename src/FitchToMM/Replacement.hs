@@ -1,5 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : FitchToMM.Replacement
+-- Description : Generates proofs for variable substitutions and replacements
 module FitchToMM.Replacement
   ( proveReplWff,
     proveReplTrm,
@@ -16,8 +19,10 @@ import FitchToMM.ProofWriter
 import FitchToMM.SyntaxProver
 import FitchToMM.Variable
 
--- Given two formulae P and Q, and a variable x, determine what (if any) term
--- t exists such that P replaces x in Q with t
+-- | Determine what term performs a given substitution between two formulas.
+--
+-- Given two formulas P and Q, and a variable x, this function attempts to find
+-- a term t such that P replaces x in Q with t.
 solveForTrm :: AllowedSubs -> Wff -> Wff -> Var -> Maybe Term
 solveForTrm freeIn wff1 wff2 x = do
   candidate <- findSub wff1 wff2 >>= getFirst
@@ -59,10 +64,16 @@ solveForTrm freeIn wff1 wff2 x = do
       return $ trmSub <> wffSub
     findSubTrm _ _ = Nothing
 
--- Given two formulae P and Q, two terms t1 and t2, and a variable x, determine
--- what (if any) formula R exists that has the variable x in those locations
--- where Q swaps t1 for t2 compared to P. I.e., x serves as a placeholder to
--- account for those differences between P and Q.
+-- | Determine what formula serves as a placeholder in a term substitution.
+--
+-- Given two formulas P and Q, two terms t1 and t2, and a variable x, this function
+-- attempts to find a formula R such that:
+-- * R with x replaced by t1 yields P
+-- * R with x replaced by t2 yields Q
+--
+-- This is useful for cases where the variable x is used as a placeholder to account
+-- for differences between P and Q when two terms may be swapped freely (e.g., in the
+-- rule for equality elimination).
 solveForWff :: AllowedSubs -> Wff -> Wff -> Term -> Term -> Var -> Maybe Wff
 solveForWff freeIn wff1 wff2 t1 t2 x = do
   candidate <- findSub wff1 wff2
@@ -95,8 +106,7 @@ solveForWff freeIn wff1 wff2 t1 t2 x = do
       | f == f' = TrmFunc f <$> zipWithM findSubTrm args args'
     findSubTrm _ _ = Nothing
 
--- Functions to prove a replacement statement once the substitution is known
-
+-- | Generate a Metamath proof for a replacement statement on a WFF.
 proveReplWff :: AllowedSubs -> Wff -> Var -> Wff -> Term -> ProofWriter
 -- Nothing is replaced in a WFF when there are no free occurrences
 proveReplWff allowed ph x ph' t
@@ -227,6 +237,7 @@ proveReplLst allowed (t : vs) x (u : ws) t1 = do
     proveMMStep "sub.lst" [xPrf, t1Prf, tsPrf, usPrf, vsPrf, wsPrf, rPrf1, rPrf2]
 proveReplLst _ _ _ _ _ = fromMistake EmptyList
 
+-- | Generate a Metamath proof for a replacement statement on a term.
 proveReplTrm :: AllowedSubs -> Term -> Var -> Term -> Term -> ProofWriter
 -- Replacing a single variable with a term just yields that term
 proveReplTrm _ t x (TrmVar x') t'

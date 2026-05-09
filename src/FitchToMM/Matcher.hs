@@ -1,5 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : FitchToMM.Matcher
+-- Description : Pattern matching of WFFs against schemas
+--
+-- This module implements pattern matching for well-formed formulas against schemas (that is, formulas
+-- containing metavariables), and handles the resulting substitutions
 module FitchToMM.Matcher
   ( Substitution,
     matchTo,
@@ -33,11 +39,15 @@ import FitchToMM.Context
 data Expression = ExprWff Wff | ExprTrm Term | ExprVar T.Text | ExprCtx Context
   deriving (Show, Eq, Ord)
 
+-- | Represents what expressions (e.g., WFFs or terms) are to be substituted for which metavariables
+-- in the instantiation of a schema
 newtype Substitution = Substitution (M.Map T.Text Expression)
   deriving (Show)
 
+-- | Matches a WFF to a schema, returning just a substitution of metavariables to expressions
+-- on success, or nothing on failure.
 matchTo :: Wff -> Wff -> Maybe Substitution
--- Any wff may match to a metavariable
+-- Any WFF may match to a metavariable
 matchTo wff (WffMetavar metavar) = Just $ singletonWff metavar wff
 -- Constant symbols must match exactly
 matchTo WffTrue WffTrue = Just empty
@@ -62,6 +72,8 @@ matchTo (WffSub t v w) (WffSub t' v' w') = do
 -- Otherwise the match fails
 matchTo _ _ = Nothing
 
+-- | Matches a term to a schema, returning just a substitution of metavariables to expressions
+-- on success, or nothing on failure.
 matchToTrm :: Term -> Term -> Maybe Substitution
 -- Any term may match to a term metavariable
 matchToTrm trm (TrmMetavar metavar) = Just $ singletonTrm metavar trm
@@ -81,6 +93,9 @@ matchToTrm (TrmSub t1 v t2) (TrmSub t1' v' t2') = do
 -- Otherwise the match fails
 matchToTrm _ _ = Nothing
 
+-- | Returns just the union of two substitutions if the are compatible, or nothing if they are incompatible.
+--
+-- Two substitutions are incompatible if they map the same metavariable to different expressions.
 merge :: Substitution -> Substitution -> Maybe Substitution
 merge (Substitution u1) (Substitution u2) = do
   guard $ and $ M.intersectionWith (==) u1 u2
@@ -89,6 +104,10 @@ merge (Substitution u1) (Substitution u2) = do
 mergeFold :: [Substitution] -> Maybe Substitution
 mergeFold = foldM merge empty
 
+-- | Check that a substitution satisfies a disjoint variable restriction (DVR), and if so,
+-- returns the set of DVRs that should be propogated.
+--
+-- If not, returns nothing.
 checkDisjoint :: Substitution -> DVR -> Maybe (S.Set DVR)
 checkDisjoint (Substitution u) (DVR v1 v2)
   | Just e1 <- u M.!? fHypName v1,
@@ -102,16 +121,17 @@ checkDisjoint _ _ = Just S.empty
 checkDisjoints :: Substitution -> [DVR] -> Maybe (S.Set DVR)
 checkDisjoints sub = fmap mconcat . traverse (checkDisjoint sub)
 
+-- | The empty substitution, mapping no metavaribles to any expressions
 empty :: Substitution
 empty = Substitution M.empty
 
-singletonWff :: T.Text -> Wff -> Substitution
+singletonWff :: Var -> Wff -> Substitution
 singletonWff x wff = Substitution $ M.singleton x (ExprWff wff)
 
-singletonTrm :: T.Text -> Term -> Substitution
+singletonTrm :: Var -> Term -> Substitution
 singletonTrm x trm = Substitution $ M.singleton x (ExprTrm trm)
 
-singletonVar :: T.Text -> T.Text -> Substitution
+singletonVar :: Var -> Var -> Substitution
 singletonVar x var = Substitution $ M.singleton x (ExprVar var)
 
 singletonCtx :: Context -> Substitution

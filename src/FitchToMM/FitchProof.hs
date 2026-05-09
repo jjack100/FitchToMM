@@ -3,9 +3,10 @@
 module FitchToMM.FitchProof where
 
 import qualified Data.Text as T
-import FitchToMM.Declarations (AllowedSubs, Condition (..))
+import FitchToMM.Declarations (Condition (..))
 import FitchToMM.Parser
 import FitchToMM.Context
+import FitchToMM.Variable ( AllowedSubs )
 
 data Citation = Line Int | Range Int Int
   deriving (Show)

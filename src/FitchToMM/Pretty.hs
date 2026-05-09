@@ -1,8 +1,12 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : FitchToMM.Pretty
+-- Description : Pretty printing for Metamath database files
+--
+-- This module manages pretty-printing of proofs into the Metamath format
 module FitchToMM.Pretty
   ( printProof,
-    prettyProof,
     prettyWff,
     prettyTrm,
     prettyPacked,
@@ -18,7 +22,7 @@ import qualified Data.Set as S
 import qualified Data.Text as T
 import FitchToMM.Compressed
 import FitchToMM.Context
-import FitchToMM.Declarations (Condition (..), Definition (..))
+import FitchToMM.Declarations (Condition (..), Definition (..), Fact(..))
 import FitchToMM.MMProof
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
@@ -26,14 +30,24 @@ import FitchToMM.SyntaxProver (constStep, funcStep, prdStep)
 import FitchToMM.Variable
 import Prettyprinter
 
+-- | Print an uncompressed proof to stdout
 printProof :: MMProof -> IO ()
 printProof proof = print $ prettyNormal proof
 
+-- | Generate a document in Metamath format for a normal (i.e., uncompressed) proof
 prettyNormal :: MMProof -> Doc a
 prettyNormal (MMProof name fact fHyps djVars rpnStack _) =
   let proof = fillSep $ map pretty $ listStack name rpnStack
    in prettyProof name fact fHyps djVars proof
 
+-- | Generate a document in Metamath format for a packed proof
+--
+-- The "packed" format is an intermediate stage between uncompressed and compressed proofs.
+-- It permits local references to previous substeps within the same proof, but does not
+-- use the encoding scheme for labels as uppercase ASCII-characters used by compressed proofs.
+--
+-- This format is not part of the official Metamath spec, but is supported as an "unofficial"
+-- format by metamath.exe
 prettyPacked :: PackedProof -> Doc a
 prettyPacked (PackedProof name fact fHyps djVars rpnStack _) =
   prettyProof name fact fHyps djVars proof
@@ -45,12 +59,14 @@ prettyPacked (PackedProof name fact fHyps djVars rpnStack _) =
       pretty n <> ":" <> pretty stepLabel
     prettyLabel (PackedStep Nothing stepLabel) = pretty stepLabel
 
+-- | Generate a document in Metamath format for a compressed proof
 prettyCompressed :: CompressedProof -> Doc a
 prettyCompressed (CompressedProof name fact fHyps djVars labels rpnStack _) =
   let prettyStack = fillCat $ map pretty $ T.unpack rpnStack
       prettyLabels = lparen <+> fillSep (map pretty labels) <+> rparen
    in prettyProof name fact fHyps djVars (prettyLabels <+> prettyStack)
 
+-- | Generate a document in Metamath format for a definition
 prettyDefinition :: Label -> SymbolType -> T.Text -> Definition -> Doc a
 prettyDefinition label symbolType definedTerm definition =
   vsep [prettySyntax, prettyDef]
@@ -121,6 +137,7 @@ prettyFHyp prefix (VarHyp n) = pretty prefix <> "var." <> pretty n <+> "$f var" 
 prettyFHyp prefix (TrmHyp n) = pretty prefix <> "trm." <> pretty n <+> "$f trm" <+> pretty n <+> "$."
 prettyFHyp prefix (CtxHyp n) = pretty prefix <> "ctx." <> pretty n <+> "$f ctx" <+> pretty n <+> "$."
 
+-- | Generate a document in Metamath format for a disjoint variable restriction
 prettyDVR :: DVR -> Doc a
 prettyDVR (DVR v1 v2) =
   "$d"
@@ -167,6 +184,7 @@ prettyCtx (RelContext ctx) = "..." <+> sep (map prettyWff $ reverse ctx) <> spac
 prettyCtx (AbsContext []) = mempty
 prettyCtx (AbsContext ctx) = sep (map prettyWff $ reverse ctx) <> space
 
+-- | Generate a document in Metamath format for a well-formed formula
 prettyWff :: Wff -> Doc a
 prettyWff (WffBinOp op lhs rhs) =
   prettySExpr [prettyOp op, prettyWff lhs, prettyWff rhs]
@@ -179,6 +197,7 @@ prettyWff (WffAtom p args) = prettySExpr $ pretty p : map prettyTrm args
 prettyWff (WffMetavar v) = pretty v
 prettyWff (WffSub trm v wff) = prettySExpr ["sub", prettyTrm trm, pretty v, prettyWff wff]
 
+-- | Generate a document in Metamath format for a term
 prettyTrm :: Term -> Doc a
 prettyTrm (TrmVar var) = pretty var
 prettyTrm (TrmFunc f args) = prettySExpr $ pretty f : map prettyTrm args

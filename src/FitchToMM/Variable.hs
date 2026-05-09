@@ -1,5 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{-|
+Module      : FitchToMM.Variable
+Description : Handling of variables and floating hypotheses in proofs
+
+This module provides utilities for working with variables and floating hypotheses
+in the context of proof formalization. It handles:
+
+- Representation of floating hypotheses (variables, terms, well-formed formulas, and contexts)
+- Disjoint variable restriction (DVR) inference and management
+- Extraction of variables from formulas and terms
+- Variable sorting according to a predefined declaration order
+-}
+
 module FitchToMM.Variable where
 
 import qualified Data.Text as T
@@ -13,9 +26,11 @@ import Data.Containers.ListUtils (nubOrd)
 import Data.Ord
 import Data.Algorithm.MaximalCliques (getMaximalCliques)
 
+-- | A variable name
 type Var = T.Text
 
--- Floating hypothesis
+-- | Floating hypothesis, that is, a hypothesis that a metavariable ranges over
+-- a specific grammatical type.
 data FHyp
   = VarHyp {fHypName :: Var}
   | TrmHyp {fHypName :: Var}
@@ -23,25 +38,39 @@ data FHyp
   | CtxHyp {fHypName :: Var}
   deriving (Ord, Eq, Show)
 
--- Disjoint variable restriction
+-- | A disjoint variable restriction (DVR) specifies that two metavariables
+-- (identified by their floating hypotheses) must have no variables in common
+-- when instantiated.
 data DVR = DVR FHyp FHyp
   deriving (Show, Eq, Ord)
 
+-- | A compound DVR represents a group of metavariables that must all be pairwise disjoint.
 type CompoundDVR = S.Set FHyp
 
-type AllowedSubs = T.Text -> [T.Text]
+-- | A function mapping variable names to those variables that are allowed to occur in the
+-- WFF or term substituted in.
+--
+-- E.g., to represent that variables @x@ and @y@ may occur in @φ@ (often denoted with the
+-- notation @φ(x,y)@), this should map @"phi"@ to @["x", "y"]@.
+type AllowedSubs = Var -> [Var]
 
+-- | Given 'AllowedSubs', determines disjoint variable restrictions (DVRs) for a
+-- a WFF.
+-- 
+-- A metavariable within the scope of a bound variable should be disjoint from it
+-- unless such a subsitution is explicitly allowed by the @AllowedSubs@ function.
+--
+-- This function also introduces DVRs between all setvars. That is, it enforces a
+-- convention against so-called "bundling", which is typically unnecessary for us
+-- (compared to e.g., setmm) because our formalization also includes metavariables
+-- ranging over terms (of which single variables are a special case) which may
+-- contain the same variables.
 inferDVRs :: AllowedSubs -> Wff -> [DVR]
 inferDVRs allowed wff = nubOrd $ setvarDVRs <> wffDVRs [] wff
   where
     fHyps = S.toList $ varsInWff wff
     setvars = filter isSetvar fHyps
-    -- Include disjoint variable restrictions between all setvars (that is, we
-    -- do not support so-called "bundling" of setvars).
     setvarDVRs = [mkDVR v1 v2 | v1 <- setvars, v2 <- setvars, v1 < v2]
-    -- Include disjoint variable restrictions for each metavariable within the
-    -- scope of a quantifier or substitution if the bound variable is not
-    -- explicitly allowed to occur in the metavariable
     wffDVRs bound (WffBinOp _ lhs rhs) = wffDVRs bound lhs <> wffDVRs bound rhs
     wffDVRs bound (WffNot expr) = wffDVRs bound expr
     wffDVRs bound (WffMetavar m) = [mkDVR (WffHyp m) (VarHyp v) | v <- bound, v `notElem` allowed m]
@@ -56,6 +85,7 @@ inferDVRs allowed wff = nubOrd $ setvarDVRs <> wffDVRs [] wff
     trmDVRs _ (TrmConst _) = []
     trmDVRs _ (TrmVar _) = []
 
+-- | Group a list of disjoint variable pairs into compound DVRs
 compoundDVRs :: [FHyp] -> [DVR] -> [CompoundDVR]
 compoundDVRs fhyps dvrs = groups ++ S.toList ungrouped
   where
@@ -80,13 +110,23 @@ compoundDVRs fhyps dvrs = groups ++ S.toList ungrouped
       let newCover = covered <> cover grouping
       return (S.fromList grouping, newCover)
 
+-- | Create a disjoint variable restriction between two floating hypotheses,
+-- ensuring consistent canonical ordering
 mkDVR :: FHyp -> FHyp -> DVR
 mkDVR v1 v2 = if v1 <= v2 then DVR v1 v2 else DVR v2 v1
 
+-- | Extract all floating hypotheses from a context.
+--
+-- For a relative context (containing the wildcard), includes the context metavariable "...".
+-- For an absolute context, returns all hypotheses from all formulas in it.
 varsInCtx :: Context -> S.Set FHyp
 varsInCtx (RelContext ctx) = S.insert (CtxHyp "...") (foldMap' varsInWff ctx)
 varsInCtx (AbsContext ctx) = foldMap' varsInWff ctx
 
+-- | Extract all floating hypotheses from a well-formed formula.
+--
+-- Returns the set of all variables, term metavariables, and WFF metavariables
+-- that appear in the formula.
 varsInWff :: Wff -> S.Set FHyp
 varsInWff (WffBinOp _ lhs rhs) = varsInWff lhs <> varsInWff rhs
 varsInWff (WffNot wff) = varsInWff wff
@@ -98,9 +138,11 @@ varsInWff (WffMetavar var) = S.singleton $ WffHyp var
 varsInWff (WffSub trm x wff) =
   S.insert (VarHyp x) (varsInTrm trm <> varsInWff wff)
 
+-- | Extract all floating hypotheses from a list of terms.
 varsInLst :: [Term] -> S.Set FHyp
 varsInLst = foldMap' varsInTrm
 
+-- | Extract all floating hypotheses from a term.
 varsInTrm :: Term -> S.Set FHyp
 varsInTrm (TrmVar x) = S.singleton $ VarHyp x
 varsInTrm (TrmFunc _ args) = varsInLst args
@@ -108,6 +150,7 @@ varsInTrm (TrmConst _) = S.empty
 varsInTrm (TrmMetavar var) = S.singleton $ TrmHyp var
 varsInTrm (TrmSub t1 x t2) = (varsInTrm t1) <> (S.singleton $ VarHyp x) <> (varsInTrm t2)
 
+-- | Variables pre-declared globally in our Metamath database
 preDeclaredVars :: [FHyp]
 preDeclaredVars =
   map CtxHyp ["...", "..._1", "..._2"]
@@ -116,6 +159,9 @@ preDeclaredVars =
     ++ map TrmHyp ["trm_1", "trm_2", "trm_3", "trm_4", "trm_5"]
     ++ [VarHyp "_a", VarHyp "_x", VarHyp "_trm_1"]
 
+-- | Sort floating hypotheses according to the declaration order in the Metamath database
+--
+-- Pre-declared variables are sorted first, followed by any other variables in their natural order.
 sortVars :: [FHyp] -> [FHyp]
 sortVars = sortOn $ \x -> (pos x, x)
   where

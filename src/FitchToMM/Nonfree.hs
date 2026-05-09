@@ -1,5 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+-- |
+-- Module      : FitchToMM.Nonfree
+-- Description : Generates proofs that variables are not free in expressions
+--
+-- This module provides functions for generating Metamath proofs that demonstrate
+-- when variables do not occur freely in well-formed formulas (WFFs), terms,
+-- contexts, and lists of terms.
+--
+-- A variable is considered free if it appears unbound by any quantifier or
+-- substitution operator in the structure.
 module FitchToMM.Nonfree
   ( proveNfWff,
     proveNfLst,
@@ -9,7 +19,6 @@ module FitchToMM.Nonfree
 where
 
 import qualified Data.Text as T
-import FitchToMM.Declarations
 import FitchToMM.Matcher
 import FitchToMM.Parser
 import FitchToMM.ProofWriter
@@ -17,6 +26,7 @@ import FitchToMM.SyntaxProver
 import FitchToMM.Context
 import FitchToMM.Variable
 
+-- | Generate a Metamath proof that a variable is not free in a context.
 proveNfCtx :: AllowedSubs -> T.Text -> Context -> ProofWriter
 proveNfCtx allowed x ctx
   -- A variable that does not occur is not free
@@ -35,6 +45,7 @@ proveNfCtx allowed x ctx = case unconsCtx ctx of
     proveMMStep "nf.ctx" [ctx1Prf, ctx2Prf, xPrf, nfPrf1, nfPrf2]
   Nothing -> fromMistake Inapplicable
 
+-- | Generate a Metamath proof that a variable is not free in a well-formed formula.
 proveNfWff :: AllowedSubs -> T.Text -> Wff -> ProofWriter
 -- A variable that does not occur is not free
 proveNfWff allowed x ph
@@ -102,6 +113,7 @@ proveNfWff allowed x (WffSub t y ph)
       proveMMStep "nf.wff-sub-2" [phPrf, xPrf, yPrf, tPrf, nfPrf1, nfPrf2]
 proveNfWff _ _ _ = fromMistake Inapplicable
 
+-- | Generate a Metamath proof that a variable is not free in a list of terms.
 proveNfLst :: AllowedSubs -> T.Text -> [Term] -> ProofWriter
 proveNfLst allowed x l
   -- A variable that does not occur is not free
@@ -120,6 +132,7 @@ proveNfLst allowed x (t : us) = do
   proveMMStep "nf.lst" [xPrf, tsPrf, usPrf, nfPrf1, nfPrf2]
 proveNfLst _ _ [] = fromMistake EmptyList
 
+-- | Generate a Metamath proof that a variable is not free in a term.
 proveNfTrm :: AllowedSubs -> T.Text -> Term -> ProofWriter
 -- A variable that does not occur is not free
 proveNfTrm allowed x t

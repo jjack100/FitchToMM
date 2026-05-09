@@ -17,6 +17,7 @@ import FitchToMM.FitchProof (EquivProof, FitchProof)
 import FitchToMM.MMProof (MMProof (proofFact, proofLabel))
 import FitchToMM.Parser (SymbolType)
 import FitchToMM.ProofWriter (Label)
+import FitchToMM.Variable ( AllowedSubs )
 
 data Collection = Collection T.Text DeclMap [Item]
 
