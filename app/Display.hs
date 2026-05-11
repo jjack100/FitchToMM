@@ -23,6 +23,7 @@ import Prettyprinter.Render.Text
 import System.Console.ANSI
 import Text.Regex.TDFA
 import FitchToMM.Context
+import FitchToMM.Variable
 
 -- Display a flattened proof in sequent-style
 prettyFlat :: Bool -> T.Text -> AllowedSubs -> [FlatStep] -> T.Text

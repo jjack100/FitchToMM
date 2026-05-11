@@ -20,6 +20,7 @@ import FitchToMM.MMProof
 import FitchToMM.Parser (SymbolType)
 import FitchToMM.Pretty
 import FitchToMM.ProofWriter
+import FitchToMM.Variable
 import qualified FitchToMM.Serialize as S
 import Paths_fitch_to_mm
 import Prettyprinter
