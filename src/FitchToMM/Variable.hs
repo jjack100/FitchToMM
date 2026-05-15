@@ -1,30 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-{-|
-Module      : FitchToMM.Variable
-Description : Handling of variables and floating hypotheses in proofs
-
-This module provides utilities for working with variables and floating hypotheses
-in the context of proof formalization. It handles:
-
-- Representation of floating hypotheses (variables, terms, well-formed formulas, and contexts)
-- Disjoint variable restriction (DVR) inference and management
-- Extraction of variables from formulas and terms
-- Variable sorting according to a predefined declaration order
--}
-
+-- |
+-- Module      : FitchToMM.Variable
+-- Description : Handling of variables and floating hypotheses in proofs
+--
+-- This module provides utilities for working with variables and floating hypotheses
+-- in the context of proof formalization. It handles:
+--
+-- - Representation of floating hypotheses (variables, terms, well-formed formulas, and contexts)
+-- - Disjoint variable restriction (DVR) inference and management
+-- - Extraction of variables from formulas and terms
+-- - Variable sorting according to a predefined declaration order
 module FitchToMM.Variable where
 
-import qualified Data.Text as T
-import FitchToMM.Context (Context(..))
-import qualified Data.Set as S
-import FitchToMM.Parser
-import Data.Foldable
-import Data.List (sortOn, elemIndex, unfoldr)
-import Data.Maybe (fromMaybe)
 import Data.Containers.ListUtils (nubOrd)
-import Data.Ord
-import Data.Algorithm.MaximalCliques (getMaximalCliques)
+import Data.Foldable
+import Data.List (elemIndex, sortOn)
+import Data.Maybe (fromMaybe)
+import qualified Data.Set as S
+import qualified Data.Text as T
+import FitchToMM.Context (Context (..))
+import FitchToMM.Parser
+import qualified Data.Map.Strict as M
 
 -- | A variable name
 type Var = T.Text
@@ -56,7 +53,7 @@ type AllowedSubs = Var -> [Var]
 
 -- | Given 'AllowedSubs', determines disjoint variable restrictions (DVRs) for a
 -- a WFF.
--- 
+--
 -- A metavariable within the scope of a bound variable should be disjoint from it
 -- unless such a subsitution is explicitly allowed by the @AllowedSubs@ function.
 --
@@ -86,29 +83,21 @@ inferDVRs allowed wff = nubOrd $ setvarDVRs <> wffDVRs [] wff
     trmDVRs _ (TrmVar _) = []
 
 -- | Group a list of disjoint variable pairs into compound DVRs
-compoundDVRs :: [FHyp] -> [DVR] -> [CompoundDVR]
-compoundDVRs fhyps dvrs = groups ++ S.toList ungrouped
+--
+-- Assumes that the given DVRs adhere to the convention that all setvars are pairwise disjoint
+compoundDVRs :: [DVR] -> [CompoundDVR]
+compoundDVRs dvrs = filter (\x -> S.size x > 1) $ setvarDVRs : metavarDVRs
   where
-    groups = unfoldr go S.empty
-    coveredDVRs = S.unions $ map (cover . S.toList) groups
-    remaining = S.difference dvrSet coveredDVRs
-    ungrouped = S.map (\(DVR l r) -> S.fromList [l, r]) remaining
-
-    dvrSet = S.fromList dvrs
-
-    cliques =
-      sortOn (Down . length) $
-        filter (\x -> length x >= 3) $
-          getMaximalCliques (\l r -> (mkDVR l r) `S.member` dvrSet) fhyps
-
-    cover :: [FHyp] -> S.Set DVR
-    cover xs = S.fromList [mkDVR x y | x <- xs, y <- xs, x < y]
-
-    go :: S.Set DVR -> Maybe (CompoundDVR, S.Set DVR)
-    go covered = do
-      grouping <- find (\x -> covered `S.disjoint` cover x) cliques
-      let newCover = covered <> cover grouping
-      return (S.fromList grouping, newCover)
+    pair (DVR x y) = S.fromList [x, y]
+    fHyps = S.unions (map pair dvrs)
+    setvarDVRs = S.filter isSetvar fHyps
+    metavarDVRs = M.elems $ foldl' insertDVR M.empty dvrs
+    
+    insertDVR dvrMap dvr@(DVR x y)
+      | not $ isSetvar x = M.insertWith S.union x (pair dvr) dvrMap
+      | not $ isSetvar y = M.insertWith S.union y (pair dvr) dvrMap
+      | otherwise = dvrMap
+    
 
 -- | Create a disjoint variable restriction between two floating hypotheses,
 -- ensuring consistent canonical ordering

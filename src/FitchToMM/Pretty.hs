@@ -100,7 +100,7 @@ prettyDefinition label symbolType definedTerm definition =
             <> prettyWff definiens
             <+> "$."
     localVars = fHyps \\ preDeclaredVars
-    compounds = compoundDVRs fHyps dvrs
+    compounds = compoundDVRs dvrs
     Definition definiendum definiens fHyps dvrs = definition
 
 prettyProof :: Label -> Fact -> [FHyp] -> [DVR] -> Doc a -> Doc a
@@ -117,7 +117,7 @@ prettyProof name fact fHyps dvrs prettyStack =
     labelLen = maximum $ map T.length (name : eLabels)
     pad = T.justifyLeft labelLen ' '
     localVars = fHyps \\ preDeclaredVars
-    compounds = compoundDVRs fHyps dvrs
+    compounds = compoundDVRs dvrs
 
 frame :: Doc a -> Doc a
 frame doc = nest 2 (vsep ["${", doc]) <> line <> "$}"
